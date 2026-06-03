@@ -3,8 +3,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routers import health, ingest, query
+from app.api.v1.routers import analytics, health, ingest, query
 from app.core.config import settings
+
+API_DESCRIPTION = """
+## SOP Automator API
+
+Knowledge Agent (RAG), document ingestion, multi-tenant org isolation, and admin analytics.
+
+### Authentication
+Send `Authorization: Bearer <supabase_jwt>` with `user_metadata.org_id` and `user_metadata.role`.
+
+For local dev without JWT secret, use headers: `X-Org-Id`, `X-User-Id`, `X-User-Role` (`admin` | `employee`).
+
+### Sprint 2 endpoints
+- `POST /api/v1/query/stream` — SSE token streaming with citations on `done` event
+- `GET /api/v1/analytics/dashboard` — admin metrics (requires admin role)
+- `DELETE /api/v1/documents/{id}` — cascade delete chunks/embeddings
+"""
 
 
 @asynccontextmanager
@@ -12,7 +28,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SOP Automator API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="SOP Automator API",
+    version="2.0.0",
+    description=API_DESCRIPTION,
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,5 +48,6 @@ app.add_middleware(
 
 api_prefix = "/api/v1"
 app.include_router(health.router, prefix=api_prefix, tags=["health"])
-app.include_router(ingest.router, prefix=api_prefix, tags=["ingest"])
-app.include_router(query.router, prefix=api_prefix, tags=["query"])
+app.include_router(ingest.router, prefix=api_prefix, tags=["documents"])
+app.include_router(query.router, prefix=api_prefix, tags=["knowledge"])
+app.include_router(analytics.router, prefix=api_prefix, tags=["analytics"])

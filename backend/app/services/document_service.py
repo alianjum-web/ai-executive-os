@@ -2,11 +2,11 @@ import uuid
 from pathlib import Path
 
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.database import Document, DocumentChunk, User
+from app.models.database import ActivityLog, Document, DocumentChunk, User
 from app.services.chunking_service import ChunkingService
 from app.services.document_parser import DocumentParser
 from app.services.embedding_service import EmbeddingService
@@ -24,7 +24,9 @@ class DocumentService:
         self,
         db: AsyncSession,
         file: UploadFile,
+        *,
         user_id: uuid.UUID | None = None,
+        org_id: uuid.UUID | None = None,
     ) -> Document:
         upload_root = Path(settings.upload_dir)
         upload_root.mkdir(parents=True, exist_ok=True)
@@ -39,11 +41,20 @@ class DocumentService:
         document = Document(
             id=doc_id,
             user_id=user_id,
+            org_id=org_id,
             filename=file.filename or "unknown",
             storage_path=str(storage_path),
             status="pending",
         )
         db.add(document)
+        await self._log_activity(
+            db,
+            user_id=user_id,
+            org_id=org_id,
+            action="document.upload",
+            resource_type="document",
+            resource_id=document.id,
+        )
         await db.commit()
         await db.refresh(document)
         return document
@@ -89,9 +100,68 @@ class DocumentService:
         finally:
             await db.commit()
 
-    async def list_documents(self, db: AsyncSession) -> list[Document]:
-        result = await db.execute(select(Document).order_by(Document.created_at.desc()))
+    async def list_documents(
+        self, db: AsyncSession, org_id: uuid.UUID | None = None
+    ) -> list[Document]:
+        stmt = select(Document).order_by(Document.created_at.desc())
+        if org_id is not None:
+            stmt = stmt.where(Document.org_id == org_id)
+        result = await db.execute(stmt)
         return list(result.scalars().all())
+
+    async def delete_document(
+        self,
+        db: AsyncSession,
+        document_id: uuid.UUID,
+        org_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+    ) -> bool:
+        stmt = select(Document).where(Document.id == document_id)
+        if org_id is not None:
+            stmt = stmt.where(Document.org_id == org_id)
+        result = await db.execute(stmt)
+        document = result.scalar_one_or_none()
+        if not document:
+            return False
+
+        path = Path(document.storage_path)
+        if path.exists():
+            path.unlink()
+
+        await db.execute(
+            delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
+        )
+        await db.delete(document)
+        await self._log_activity(
+            db,
+            user_id=user_id,
+            org_id=org_id,
+            action="document.delete",
+            resource_type="document",
+            resource_id=document_id,
+        )
+        await db.commit()
+        return True
+
+    async def _log_activity(
+        self,
+        db: AsyncSession,
+        *,
+        user_id: uuid.UUID | None,
+        org_id: uuid.UUID | None,
+        action: str,
+        resource_type: str,
+        resource_id: uuid.UUID,
+    ) -> None:
+        db.add(
+            ActivityLog(
+                user_id=user_id,
+                org_id=org_id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+            )
+        )
 
     async def ensure_default_user(self, db: AsyncSession) -> User:
         result = await db.execute(select(User).limit(1))

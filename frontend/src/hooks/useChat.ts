@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
-import { queryKnowledgeStream } from "@/lib/api";
+import { useQueryStream } from "@/hooks/useQueryStream";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   addMessage,
   setStreaming,
+  updateAssistantMessage,
   type ChatMessage,
 } from "@/store/slices/chatSlice";
 
@@ -13,6 +14,7 @@ export function useChat() {
   const dispatch = useAppDispatch();
   const messages = useAppSelector((s) => s.chat.messages);
   const isStreaming = useAppSelector((s) => s.chat.isStreaming);
+  const { streamQuery } = useQueryStream();
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -25,25 +27,35 @@ export function useChat() {
       dispatch(setStreaming(true));
 
       const assistantId = crypto.randomUUID();
-      let answer = "";
+      dispatch(
+        addMessage({
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          citations: [],
+        })
+      );
 
       try {
-        const result = await queryKnowledgeStream(text, (chunk) => {
-          answer = chunk;
+        const result = await streamQuery(text, (accumulated) => {
+          dispatch(
+            updateAssistantMessage({
+              id: assistantId,
+              content: accumulated,
+            })
+          );
         });
         dispatch(
-          addMessage({
+          updateAssistantMessage({
             id: assistantId,
-            role: "assistant",
-            content: result.answer || answer,
+            content: result.answer,
             citations: result.citations,
           })
         );
       } catch (err) {
         dispatch(
-          addMessage({
+          updateAssistantMessage({
             id: assistantId,
-            role: "assistant",
             content:
               err instanceof Error ? err.message : "Failed to get a response.",
           })
@@ -52,7 +64,7 @@ export function useChat() {
         dispatch(setStreaming(false));
       }
     },
-    [dispatch]
+    [dispatch, streamQuery]
   );
 
   return { messages, isStreaming, sendMessage };

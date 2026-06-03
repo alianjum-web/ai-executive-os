@@ -5,16 +5,23 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import { useSidebar } from "@/hooks/useSidebar";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { useRole } from "@/hooks/useRole";
 
 const links = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/knowledge", label: "Knowledge", flag: "DOCUMENT_UPLOAD_ENABLED" as const },
-  { href: "/chat", label: "Chat", flag: "KNOWLEDGE_AGENT_ENABLED" as const },
+  { href: "/dashboard", label: "Dashboard", adminOnly: false },
+  {
+    href: "/knowledge",
+    label: "Knowledge",
+    flag: "DOCUMENT_UPLOAD_ENABLED" as const,
+    adminOnly: true,
+  },
+  { href: "/chat", label: "Chat", flag: "KNOWLEDGE_AGENT_ENABLED" as const, adminOnly: false },
 ];
 
 export function SidebarNav() {
   const pathname = usePathname();
   const { isOpen } = useSidebar();
+  const { isAdmin } = useRole();
   const documentUploadEnabled = useFeatureFlag("DOCUMENT_UPLOAD_ENABLED");
   const knowledgeEnabled = useFeatureFlag("KNOWLEDGE_AGENT_ENABLED");
 
@@ -34,6 +41,7 @@ export function SidebarNav() {
       </p>
       <nav className="flex flex-col gap-1">
         {links.map((link) => {
+          if (link.adminOnly && !isAdmin) return null;
           if (!flagEnabled(link.flag)) return null;
           return (
             <Link

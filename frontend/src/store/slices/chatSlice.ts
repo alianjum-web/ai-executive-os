@@ -31,8 +31,25 @@ const chatSlice = createSlice({
     clearMessages(state) {
       state.messages = [];
     },
+    updateAssistantMessage(
+      state,
+      action: PayloadAction<{
+        id: string;
+        content: string;
+        citations?: ChatMessage["citations"];
+      }>
+    ) {
+      const msg = state.messages.find((m) => m.id === action.payload.id);
+      if (msg) {
+        msg.content = action.payload.content;
+        if (action.payload.citations) {
+          msg.citations = action.payload.citations;
+        }
+      }
+    },
   },
 });
 
-export const { addMessage, setStreaming, clearMessages } = chatSlice.actions;
+export const { addMessage, setStreaming, clearMessages, updateAssistantMessage } =
+  chatSlice.actions;
 export default chatSlice.reducer;

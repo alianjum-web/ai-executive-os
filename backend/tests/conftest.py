@@ -4,6 +4,14 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def bypass_user_db_sync(monkeypatch):
+    async def noop(db, auth):
+        return None
+
+    monkeypatch.setattr("app.core.security._ensure_user_row", noop)
+
+
 @pytest.fixture
 async def client():
     transport = ASGITransport(app=app)

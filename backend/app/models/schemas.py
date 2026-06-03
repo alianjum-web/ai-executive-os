@@ -21,17 +21,26 @@ class IngestResponse(BaseModel):
 
 
 class Citation(BaseModel):
+    chunk_id: uuid.UUID | None = None
     document_name: str
     page_number: int | None = None
-    excerpt: str
+    chunk_text: str
+    excerpt: str | None = None
 
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1)
-    user_id: uuid.UUID | None = None
 
 
 class QueryResponse(BaseModel):
     answer: str
     citations: list[Citation] = []
     latency_ms: int | None = None
+
+
+class AnalyticsDashboard(BaseModel):
+    queries_today: int
+    latency_p50_ms: int | None
+    latency_p95_ms: int | None
+    documents_indexed: int
+    top_questions: list[dict]

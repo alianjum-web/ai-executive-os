@@ -1,7 +1,9 @@
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import DocumentChunk
+from app.models.database import Document, DocumentChunk
 
 
 class VectorService:
@@ -15,20 +17,23 @@ class VectorService:
         self,
         db: AsyncSession,
         embedding: list[float],
+        org_id: uuid.UUID | None = None,
         top_k: int = 5,
-        min_score: float = 0.25,
-    ) -> list[tuple[DocumentChunk, float]]:
+        min_score: float = 0.2,
+    ) -> list[tuple[DocumentChunk, float, Document]]:
         distance = DocumentChunk.embedding.cosine_distance(embedding)
         stmt = (
-            select(DocumentChunk, (1 - distance).label("score"))
+            select(DocumentChunk, (1 - distance).label("score"), Document)
+            .join(Document, Document.id == DocumentChunk.document_id)
             .where(DocumentChunk.embedding.isnot(None))
-            .order_by(distance)
-            .limit(top_k)
         )
+        if org_id is not None:
+            stmt = stmt.where(Document.org_id == org_id)
+        stmt = stmt.order_by(distance).limit(top_k)
         result = await db.execute(stmt)
         rows = result.all()
         return [
-            (row[0], float(row[1]))
+            (row[0], float(row[1]), row[2])
             for row in rows
             if row[1] is not None and float(row[1]) >= min_score
         ]

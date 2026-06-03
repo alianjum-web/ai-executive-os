@@ -53,16 +53,20 @@ Use this section to track where we are. Update it as sprints complete.
 
 ### 1.2 Active Sprint
 
-**Sprint 1 — Foundation & MVP Knowledge Agent** — Complete
+**Sprint 2 — RAG Quality, Multi-Tenancy & Dashboard** — Complete
 
-- [x] Monorepo scaffold (`frontend`, `backend`, `docker`)
-- [x] PostgreSQL + pgvector + Alembic (`users`, `documents`, `document_chunks`, `queries`)
-- [x] Document ingestion (PDF/DOCX/MD), chunking ≤800 tokens, embeddings
-- [x] LangGraph Knowledge Agent + `/api/v1/query`
-- [x] Celery + Redis background processing, ingest returns 202
-- [x] Admin upload UI + status table + chat with citations
-- [x] Supabase Auth + feature flags (Sprint 1 trio enabled)
-- [x] Unit + integration tests (backend + Button/Input atoms)
+- [x] LangGraph relevance grading (drop chunks graded ≤2)
+- [x] Cohere Rerank API (+ heuristic fallback)
+- [x] Citation cards with full chunk text, document name, page
+- [x] Organizations + org_id isolation on all queries
+- [x] Admin analytics dashboard (Recharts)
+- [x] Query logging with cited_chunk_ids + latency_ms
+- [x] RBAC: admin upload/metrics, employee chat-only
+- [x] Document DELETE with cascade
+- [x] SSE token streaming (`/query/stream` + `useQueryStream`)
+- [x] OpenAPI at `/docs` + README API section
+
+**Sprint 1 — Foundation & MVP Knowledge Agent** — Complete
 
 ### 1.3 Decisions Log
 

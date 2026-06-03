@@ -12,6 +12,8 @@ export default function LoginPage() {
   const authEnabled = useFeatureFlag("BASIC_AUTH_ENABLED");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [orgId, setOrgId] = useState("");
+  const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -40,7 +42,17 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            org_id: orgId || crypto.randomUUID(),
+            org_name: orgName || "My Organization",
+            role: "admin",
+          },
+        },
+      });
       if (signUpError) throw signUpError;
       setError("Check your email to confirm your account, then sign in.");
     } catch (err) {
@@ -81,6 +93,17 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+        />
+        <Input
+          label="Organization ID (sign up)"
+          placeholder="Leave blank to auto-generate"
+          value={orgId}
+          onChange={(e) => setOrgId(e.target.value)}
+        />
+        <Input
+          label="Organization name (sign up)"
+          value={orgName}
+          onChange={(e) => setOrgName(e.target.value)}
         />
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <div className="flex gap-2">

@@ -1,5 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import chatReducer from "./slices/chatSlice";
+import orgReducer from "./slices/orgSlice";
 import uiReducer from "./slices/uiSlice";
 import userReducer from "./slices/userSlice";
 
@@ -9,6 +10,7 @@ export const makeStore = () =>
       ui: uiReducer,
       chat: chatReducer,
       user: userReducer,
+      org: orgReducer,
     },
   });
 
