@@ -25,7 +25,7 @@ async def test_filter_drops_low_relevance_chunks():
     )
     assert len(filtered) <= len(chunks)
     for item in filtered:
-        assert item["grade"] > 2
+        assert item["grade"] >= 3
 
 
 @pytest.mark.asyncio
