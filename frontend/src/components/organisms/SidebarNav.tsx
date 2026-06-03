@@ -22,6 +22,7 @@ const links = [
     flag: "PROJECT_AGENT_ENABLED" as const,
     adminOnly: false,
   },
+  { href: "/settings", label: "Settings", adminOnly: true },
 ];
 
 export function SidebarNav() {

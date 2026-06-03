@@ -1,29 +1,43 @@
-import json
 import re
 
-from app.services.llm_service import LLMService
+from openai import AsyncOpenAI
+
+from app.core.config import settings
 
 
 class GradingService:
-    """LLM grades chunk relevance 1-5; chunks scoring <=2 are dropped."""
+    """LLM grades chunk relevance 1-5 (gpt-4o-mini); chunks scoring <=2 are dropped."""
 
     def __init__(self) -> None:
-        self.llm = LLMService()
+        self._client: AsyncOpenAI | None = None
+        if settings.openai_api_key:
+            self._client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     async def grade_chunk(self, query: str, chunk_text: str) -> int:
         if not chunk_text.strip():
             return 1
 
-        if self.llm.has_client:
-            prompt = (
-                f"Rate how relevant this document chunk is to the user question.\n"
-                f"Question: {query}\n\nChunk:\n{chunk_text[:1500]}\n\n"
-                "Reply with ONLY a single integer from 1 (irrelevant) to 5 (highly relevant)."
+        if self._client:
+            response = await self._client.chat.completions.create(
+                model=settings.openai_grading_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Rate document chunk relevance to the question. "
+                            "Reply with ONLY one integer 1-5."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Question: {query}\n\nChunk:\n{chunk_text[:1500]}"
+                        ),
+                    },
+                ],
+                temperature=0,
             )
-            raw = await self.llm.generate_answer(
-                "Return only a number 1-5.",
-                prompt,
-            )
+            raw = response.choices[0].message.content or ""
             match = re.search(r"[1-5]", raw)
             if match:
                 return int(match.group())
@@ -53,6 +67,6 @@ class GradingService:
         for item in chunks:
             score = await self.grade_chunk(query, item["content"])
             item["grade"] = score
-            if score > 2:
+            if score >= min_grade:
                 graded.append(item)
         return graded

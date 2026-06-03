@@ -36,6 +36,11 @@ class QueryResponse(BaseModel):
     answer: str
     citations: list[Citation] = []
     latency_ms: int | None = None
+    cached: bool = False
+
+
+class QueryRatingRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
 
 
 class TicketResponse(BaseModel):
@@ -49,9 +54,26 @@ class TicketResponse(BaseModel):
     assignee_email: str | None = None
     assignee_id: uuid.UUID | None = None
     slack_channel_id: str | None = None
+    external_ticket_id: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ActivityLogEntry(BaseModel):
+    id: uuid.UUID
+    action: str
+    resource_type: str
+    user_id: uuid.UUID | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TicketDetailResponse(TicketResponse):
+    raw_payload: dict | None = None
+    jira_url: str | None = None
+    audit_timeline: list[ActivityLogEntry] = []
 
 
 class AnalyticsDashboard(BaseModel):
@@ -60,3 +82,17 @@ class AnalyticsDashboard(BaseModel):
     latency_p95_ms: int | None
     documents_indexed: int
     top_questions: list[dict]
+
+
+class HistogramBucket(BaseModel):
+    bucket: str
+    count: int
+
+
+class AdvancedAnalyticsDashboard(AnalyticsDashboard):
+    query_volume_by_day: list[dict] = []
+    latency_histogram: list[HistogramBucket] = []
+    ticket_resolution_histogram: list[HistogramBucket] = []
+    agent_accuracy_score: float | None = None
+    rated_queries_count: int = 0
+    period_days: int = 30

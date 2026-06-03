@@ -1,0 +1,5 @@
+{
+  "from": "customer@example.com",
+  "subject": "Billing dispute on invoice 8842",
+  "text": "We were charged twice for invoice 8842. Please investigate."
+}

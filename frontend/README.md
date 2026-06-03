@@ -2,7 +2,9 @@
 
 AI-Powered Executive Operating System — Knowledge Agent (RAG) + Project Agent (event-driven ticket routing).
 
-**Engineering master doc (vision, architecture, sprints, Redux rules):** [docs/PROJECT_MASTER.md](./docs/PROJECT_MASTER.md)
+**Shared docs (repo root):** [docs/PROJECT_MASTER.md](../docs/PROJECT_MASTER.md) · [docs/ENVIRONMENT_VARIABLES.md](../docs/ENVIRONMENT_VARIABLES.md)
+
+Run locally: `cp .env.example .env.local` then `npm run dev`.
 
 ## Getting Started
 

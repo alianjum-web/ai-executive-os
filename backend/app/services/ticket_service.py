@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.database import Ticket
+from app.models.database import ActivityLog, Ticket
 
 
 class TicketService:
@@ -32,6 +32,25 @@ class TicketService:
             .options(selectinload(Ticket.assignee))
         )
         return result.scalar_one_or_none()
+
+    async def list_activity_for_ticket(
+        self,
+        db: AsyncSession,
+        ticket_id: uuid.UUID,
+        org_id: uuid.UUID | None = None,
+    ) -> list[ActivityLog]:
+        stmt = (
+            select(ActivityLog)
+            .where(
+                ActivityLog.resource_type == "ticket",
+                ActivityLog.resource_id == ticket_id,
+            )
+            .order_by(ActivityLog.created_at.asc())
+        )
+        if org_id is not None:
+            stmt = stmt.where(ActivityLog.org_id == org_id)
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     async def create_ticket_record(
         self,

@@ -1,10 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.feature_flags import flags
+from app.core.rate_limit import limiter, org_rate_limit_key
 from app.core.security import AuthContext, get_current_user, require_admin, tenant_org_id
 from app.models.schemas import DocumentResponse, IngestResponse
 from app.services.document_service import DocumentService
@@ -14,7 +15,9 @@ router = APIRouter()
 
 
 @router.post("/ingest", status_code=202, response_model=IngestResponse)
+@limiter.limit("10/hour", key_func=org_rate_limit_key)
 async def ingest_document(
+    request: Request,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     auth: AuthContext = Depends(require_admin),

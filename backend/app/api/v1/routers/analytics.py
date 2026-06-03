@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.feature_flags import flags
 from app.core.security import AuthContext, require_admin, tenant_org_id
-from app.models.schemas import AnalyticsDashboard
+from app.models.schemas import AdvancedAnalyticsDashboard, AnalyticsDashboard
 from app.services.analytics_service import AnalyticsService
 
 router = APIRouter()
@@ -24,3 +24,20 @@ async def get_dashboard_metrics(
     service = AnalyticsService()
     metrics = await service.get_dashboard_metrics(db, org_id or auth.org_id)
     return AnalyticsDashboard(**metrics)
+
+
+@router.get("/analytics/advanced", response_model=AdvancedAnalyticsDashboard)
+async def get_advanced_dashboard(
+    db: AsyncSession = Depends(get_db),
+    auth: AuthContext = Depends(require_admin),
+    org_id: uuid.UUID | None = Depends(tenant_org_id),
+    days: int = 30,
+):
+    if not flags.ANALYTICS_DASHBOARD_ENABLED:
+        raise HTTPException(status_code=404, detail="Analytics dashboard is not enabled")
+
+    service = AnalyticsService()
+    metrics = await service.get_advanced_metrics(
+        db, org_id or auth.org_id, days=min(max(days, 1), 90)
+    )
+    return AdvancedAnalyticsDashboard(**metrics)

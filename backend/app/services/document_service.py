@@ -5,11 +5,11 @@ from fastapi import UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.models.database import ActivityLog, Document, DocumentChunk, User
-from app.services.chunking_service import ChunkingService
+from app.services.chunking_service import ChunkingService, TextChunk
 from app.services.document_parser import DocumentParser
 from app.services.embedding_service import EmbeddingService
+from app.services.storage_service import StorageService
 from app.services.vector_service import VectorService
 
 
@@ -19,6 +19,7 @@ class DocumentService:
         self.chunker = ChunkingService()
         self.embedder = EmbeddingService()
         self.vector = VectorService()
+        self.storage = StorageService()
 
     async def save_upload(
         self,
@@ -28,22 +29,20 @@ class DocumentService:
         user_id: uuid.UUID | None = None,
         org_id: uuid.UUID | None = None,
     ) -> Document:
-        upload_root = Path(settings.upload_dir)
-        upload_root.mkdir(parents=True, exist_ok=True)
-
         doc_id = uuid.uuid4()
-        suffix = Path(file.filename or "upload.bin").suffix.lower()
-        storage_path = upload_root / f"{doc_id}{suffix}"
-
         content = await file.read()
-        storage_path.write_bytes(content)
+        storage_path = self.storage.save_bytes(
+            content,
+            document_id=doc_id,
+            filename=file.filename or "unknown",
+        )
 
         document = Document(
             id=doc_id,
             user_id=user_id,
             org_id=org_id,
             filename=file.filename or "unknown",
-            storage_path=str(storage_path),
+            storage_path=storage_path,
             status="pending",
         )
         db.add(document)
@@ -69,19 +68,27 @@ class DocumentService:
         await db.commit()
 
         try:
-            pages = self.parser.extract_text(Path(document.storage_path))
-            all_chunks = []
+            read_path = self.storage.resolve_read_path(document.storage_path)
+            pages = self.parser.extract_text(read_path)
+
+            all_chunks: list[TextChunk] = []
+            next_index = 0
             for page_text, page_num in pages:
-                all_chunks.extend(
-                    self.chunker.chunk_text(page_text, page_number=page_num)
+                page_chunks = self.chunker.chunk_text(
+                    page_text, page_number=page_num, start_index=next_index
                 )
+                all_chunks.extend(page_chunks)
+                if page_chunks:
+                    next_index = page_chunks[-1].chunk_index + 1
 
             if not all_chunks:
                 raise ValueError("No text extracted from document")
 
+            texts = [c.content for c in all_chunks]
+            embeddings = await self.embedder.embed_many(texts)
+
             db_chunks: list[DocumentChunk] = []
-            for chunk in all_chunks:
-                embedding = await self.embedder.embed(chunk.content)
+            for chunk, embedding in zip(all_chunks, embeddings, strict=True):
                 db_chunks.append(
                     DocumentChunk(
                         document_id=document.id,
@@ -124,9 +131,10 @@ class DocumentService:
         if not document:
             return False
 
-        path = Path(document.storage_path)
-        if path.exists():
-            path.unlink()
+        if not document.storage_path.startswith("supabase:"):
+            path = Path(document.storage_path)
+            if path.exists():
+                path.unlink()
 
         await db.execute(
             delete(DocumentChunk).where(DocumentChunk.document_id == document_id)

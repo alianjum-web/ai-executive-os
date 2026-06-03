@@ -7,7 +7,10 @@ from typing import Any, TypedDict
 from langgraph.graph import END, StateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import QueryCacheService
 from app.core.config import settings
+from app.core.feature_flags import flags
+from app.core.telemetry import trace_span
 from app.models.database import QueryLog
 from app.models.schemas import Citation, QueryResponse
 from app.services.embedding_service import EmbeddingService
@@ -33,6 +36,7 @@ class KnowledgeAgent:
         self.vector = VectorService()
         self.grader = GradingService()
         self.reranker = RerankService()
+        self.cache = QueryCacheService()
         self.graph = self._build_graph()
 
     def _build_graph(self):
@@ -43,9 +47,9 @@ class KnowledgeAgent:
         workflow.add_node("generate_answer", self._generate_answer)
         workflow.add_node("format_citations", self._format_citations)
         workflow.set_entry_point("parse_query")
-        workflow.add_edge("parse_query", "grade_relevance")
-        workflow.add_edge("grade_relevance", "rerank_chunks")
-        workflow.add_edge("rerank_chunks", "generate_answer")
+        workflow.add_edge("parse_query", "rerank_chunks")
+        workflow.add_edge("rerank_chunks", "grade_relevance")
+        workflow.add_edge("grade_relevance", "generate_answer")
         workflow.add_edge("generate_answer", "format_citations")
         workflow.add_edge("format_citations", END)
         return workflow.compile()
@@ -79,9 +83,20 @@ class KnowledgeAgent:
                 ),
                 "context": "",
             }
-        context = "\n\n---\n\n".join(i["content"] for i in items)
-        answer = await self.llm.generate_answer(state["parsed_query"], context)
+        context = self._numbered_context(items)
+        answer = await self.llm.generate_answer(
+            state["parsed_query"],
+            context,
+            cite_with_markers=True,
+        )
         return {"answer": answer, "context": context}
+
+    @staticmethod
+    def _numbered_context(items: list[dict]) -> str:
+        parts = []
+        for i, item in enumerate(items, start=1):
+            parts.append(f"[{i}] {item['content']}")
+        return "\n\n".join(parts)
 
     async def _format_citations(self, state: KnowledgeState) -> dict:
         citations = []
@@ -100,25 +115,28 @@ class KnowledgeAgent:
     async def _retrieve(
         self, db: AsyncSession, query: str, org_id: uuid.UUID | None
     ) -> list[dict]:
-        embedding = await self.embedder.embed(query)
-        rows = await self.vector.similarity_search(
-            db,
-            embedding,
-            org_id=org_id,
-            top_k=settings.retrieval_top_k,
-        )
-        items: list[dict] = []
-        for chunk, score, document in rows:
-            items.append(
-                {
-                    "chunk_id": chunk.id,
-                    "content": chunk.content,
-                    "document_name": document.filename,
-                    "page_number": chunk.page_number,
-                    "score": score,
-                }
+        async with trace_span("retrieve_chunks", trace_id=None) as span:
+            embedding = await self.embedder.embed(query)
+            span.set_attribute("embedding_dims", len(embedding))
+            rows = await self.vector.similarity_search(
+                db,
+                embedding,
+                org_id=org_id,
+                top_k=settings.retrieval_top_k,
             )
-        return items
+            span.set_attribute("chunks_retrieved", len(rows))
+            items: list[dict] = []
+            for chunk, score, document in rows:
+                items.append(
+                    {
+                        "chunk_id": chunk.id,
+                        "content": chunk.content,
+                        "document_name": document.filename,
+                        "page_number": chunk.page_number,
+                        "score": score,
+                    }
+                )
+            return items
 
     def _build_citation_models(self, raw: list[dict]) -> list[Citation]:
         return [
@@ -157,6 +175,32 @@ class KnowledgeAgent:
         db.add(log)
         await db.commit()
 
+    async def _run_graph(self, query: str, chunk_items: list[dict]) -> KnowledgeState:
+        trace_id = uuid.uuid4().hex[:16]
+        state: KnowledgeState = {"query": query, "chunk_items": chunk_items}
+
+        async with trace_span("parse_query", trace_id=trace_id) as span:
+            state.update(await self._parse_query(state))
+            span.set_attribute("query_len", len(query))
+
+        async with trace_span("rerank_chunks", trace_id=trace_id) as span:
+            state.update(await self._rerank_chunks(state))
+            span.set_attribute("chunks_after_rerank", len(state.get("chunk_items", [])))
+
+        async with trace_span("grade_relevance", trace_id=trace_id) as span:
+            state.update(await self._grade_relevance(state))
+            span.set_attribute("chunks_after_grade", len(state.get("chunk_items", [])))
+
+        async with trace_span("generate_answer", trace_id=trace_id) as span:
+            state.update(await self._generate_answer(state))
+            span.set_attribute("answer_len", len(state.get("answer", "")))
+
+        async with trace_span("format_citations", trace_id=trace_id) as span:
+            state.update(await self._format_citations(state))
+            span.set_attribute("citation_count", len(state.get("citations", [])))
+
+        return state
+
     async def run(
         self,
         db: AsyncSession,
@@ -165,11 +209,24 @@ class KnowledgeAgent:
         user_id: uuid.UUID | None = None,
         org_id: uuid.UUID | None = None,
     ) -> QueryResponse:
+        org_key = str(org_id) if org_id else None
+        if flags.RAG_CACHE_ENABLED:
+            cached = await self.cache.get_cached_answer(query, org_key)
+            if cached:
+                citations = self._build_citation_models(cached.get("citations", []))
+                return QueryResponse(
+                    answer=cached["answer"],
+                    citations=citations,
+                    latency_ms=cached.get("latency_ms", 1),
+                    cached=True,
+                )
+
         start = time.perf_counter()
-        chunk_items = await self._retrieve(db, query, org_id)
-        final_state = await self.graph.ainvoke(
-            {"query": query, "chunk_items": chunk_items}
-        )
+        async with trace_span("rag_query", trace_id=None) as root:
+            root.set_attribute("org_id", org_key or "")
+            chunk_items = await self._retrieve(db, query, org_id)
+            final_state = await self._run_graph(query, chunk_items)
+
         answer = final_state.get("answer", "")
         citations = self._build_citation_models(final_state.get("citations", []))
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -182,15 +239,25 @@ class KnowledgeAgent:
             org_id=org_id,
             latency_ms=latency_ms,
         )
-        return QueryResponse(answer=answer, citations=citations, latency_ms=latency_ms)
+
+        if flags.RAG_CACHE_ENABLED:
+            await self.cache.set_cached_answer(
+                query,
+                org_key,
+                {
+                    "answer": answer,
+                    "citations": [c.model_dump(mode="json") for c in citations],
+                    "latency_ms": latency_ms,
+                },
+                ttl_seconds=settings.rag_cache_ttl_seconds,
+            )
+
+        return QueryResponse(
+            answer=answer, citations=citations, latency_ms=latency_ms, cached=False
+        )
 
     async def _pipeline_through_rerank(self, query: str, chunk_items: list[dict]) -> KnowledgeState:
-        state: KnowledgeState = {"query": query, "chunk_items": chunk_items}
-        state.update(await self._parse_query(state))
-        state.update(await self._grade_relevance(state))
-        state.update(await self._rerank_chunks(state))
-        state.update(await self._format_citations(state))
-        return state
+        return await self._run_graph(query, chunk_items)
 
     async def run_stream(
         self,
@@ -204,13 +271,16 @@ class KnowledgeAgent:
         chunk_items = await self._retrieve(db, query, org_id)
         pipeline_state = await self._pipeline_through_rerank(query, chunk_items)
         items = pipeline_state.get("chunk_items", [])
-        context = "\n\n---\n\n".join(i["content"] for i in items) if items else ""
+        context = self._numbered_context(items) if items else ""
         citations = self._build_citation_models(pipeline_state.get("citations", []))
 
         full_answer = ""
-        async for token in self.llm.stream_answer(query, context):
-            full_answer += token
-            yield json.dumps({"type": "token", "content": token}) + "\n"
+        async with trace_span("stream_answer", trace_id=None):
+            async for token in self.llm.stream_answer(
+                query, context, cite_with_markers=bool(items)
+            ):
+                full_answer += token
+                yield json.dumps({"type": "token", "content": token}) + "\n"
 
         latency_ms = int((time.perf_counter() - start) * 1000)
         await self._save_query_log(

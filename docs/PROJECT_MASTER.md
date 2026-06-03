@@ -25,11 +25,14 @@ This document is the single source of truth for product vision, architecture, co
 5. [Design Patterns & Standards](#5-design-patterns--standards)
 6. [Redux State Management (Team Decision)](#6-redux-state-management-team-decision)
 7. [Feature Flag System](#7-feature-flag-system)
-8. [Testing Strategy](#8-testing-strategy)
-9. [Sprint Plan](#9-sprint-plan)
-10. [Database Schema](#10-database-schema)
-11. [LangGraph Agent Flows](#11-langgraph-agent-flows)
-12. [Appendix: Quick Reference for Agents](#appendix-quick-reference-for-agents)
+8. [RAG Pipeline Technical Deep Dive](#8-rag-pipeline-technical-deep-dive)
+9. [Environment Variables Reference](#9-environment-variables-reference)
+10. [cursor.md — AI Code Generation Rules](#10-cursormd--ai-code-generation-rules)
+11. [Testing Strategy](#11-testing-strategy)
+12. [Sprint Plan](#12-sprint-plan)
+13. [Database Schema](#13-database-schema)
+14. [LangGraph Agent Flows](#14-langgraph-agent-flows)
+15. [Appendix: Quick Reference for Agents](#appendix-quick-reference-for-agents)
 
 ---
 
@@ -49,9 +52,33 @@ Use this section to track where we are. Update it as sprints complete.
 | Feature flags | Done | `src/config/features.config.ts` + backend flags |
 | Auth | Done | **Supabase Auth** (email/password) — see `frontend/.env.example` |
 | Knowledge Agent (RAG) | Done | MVP: upload → embed → query with citations |
-| Project Agent (routing) | Not started | Sprint 3+ |
+| Project Agent (routing) | Done | Slack + email webhooks, Jira sync, workload balancing |
+| Jira / SendGrid integrations | Done | Encrypted org settings, admin `/settings` UI |
+| Audit trail | Done | `activity_logs` on create, assign, Jira sync |
 
 ### 1.2 Active Sprint
+
+**Sprint 5 — Analytics, Hardening & Production** — Complete
+
+- [x] Advanced analytics dashboard (volume line chart, top questions, latency histogram, resolution time, accuracy score)
+- [x] Sentry integration (FastAPI + Next.js)
+- [x] Structured RAG tracing (span IDs per LangGraph node)
+- [x] Redis RAG cache (1h TTL, SHA-256 query+org key)
+- [x] Rate limits: 60 queries/min user, 10 uploads/hour org
+- [x] CSV export (queries + tickets)
+- [x] LLM provider abstraction (OpenAI / Anthropic via `LLM_PROVIDER`)
+- [x] Production Docker (`Dockerfile.prod`, `docker-compose.prod.yml`)
+- [x] GitHub Actions CI, security audit doc, full README
+
+**Sprint 4 — Jira, Email & Workload** — Complete
+
+- [x] Jira REST API v3 (`create_issue`, `update_issue`, `get_user_workload`) with OAuth bearer token
+- [x] `POST /api/v1/webhook/email` (SendGrid inbound) → Celery → Project Agent
+- [x] Workload balancing (lowest open Jira issues per assignee)
+- [x] SendGrid HTML email fallback when Slack DM fails
+- [x] `GET /api/v1/tickets/{id}` — payload, Jira link, audit timeline
+- [x] Admin settings API + `/settings` UI (Fernet-encrypted secrets)
+- [x] Flags: `JIRA_INTEGRATION_ENABLED`, `EMAIL_WEBHOOK_ENABLED`, `WORKLOAD_BALANCING_ENABLED`, `AUDIT_LOG_ENABLED`
 
 **Sprint 3 — Project Agent & Slack** — Complete
 
@@ -402,20 +429,18 @@ export const FEATURE_FLAGS = {
   DOCUMENT_UPLOAD_ENABLED: true,
   BASIC_AUTH_ENABLED: true,
 
-  // Sprint 3
-  PROJECT_AGENT_ENABLED: false,
-  SLACK_WEBHOOK_ENABLED: false,
-  EMAIL_WEBHOOK_ENABLED: false,
+  // Sprint 3–4
+  PROJECT_AGENT_ENABLED: true,
+  SLACK_WEBHOOK_ENABLED: true,
+  EMAIL_WEBHOOK_ENABLED: true,
+  JIRA_INTEGRATION_ENABLED: true,
+  WORKLOAD_BALANCING_ENABLED: true,
+  MULTI_TENANT_ENABLED: true,
+  ANALYTICS_DASHBOARD_ENABLED: true,
+  AUDIT_LOG_ENABLED: true,
 
-  // Sprint 4
-  JIRA_INTEGRATION_ENABLED: false,
-  WORKLOAD_BALANCING_ENABLED: false,
-  MULTI_TENANT_ENABLED: false,
-
-  // Sprint 5
-  ANALYTICS_DASHBOARD_ENABLED: false,
-  AUDIT_LOG_ENABLED: false,
-  CUSTOM_LLM_PROVIDER_ENABLED: false,
+  CUSTOM_LLM_PROVIDER_ENABLED: true,
+  RAG_CACHE_ENABLED: true,
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;
@@ -435,7 +460,81 @@ Environment prefix `FEATURE_`. Return 404 when disabled (e.g. Slack webhook).
 
 ---
 
-## 8. Testing Strategy
+## 8. RAG Pipeline Technical Deep Dive
+
+### 8.1 Document Ingestion Flow (Step by Step)
+
+| Step | Action | Tool / Library | Output |
+|------|--------|----------------|--------|
+| 1 | Upload | Next.js → `POST /api/v1/ingest` multipart | File in **Supabase Storage** when `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set; else local `UPLOAD_DIR`. DB row `status: pending`. |
+| 2 | Queue | FastAPI `process_document_task.delay(document_id)` | Celery worker picks up task |
+| 3 | Extract | Worker reads file via `StorageService` (downloads from Supabase if needed) | PyMuPDF (`fitz`) PDF, `python-docx` DOCX, UTF-8 read MD/TXT — `(text, page_num)` segments |
+| 4 | Chunk | `ChunkingService` — LangChain `RecursiveCharacterTextSplitter.from_tiktoken_encoder` | `TextChunk` list, ≤800 tokens, global `chunk_index` |
+| 5 | Embed | `EmbeddingService.embed_many` — OpenAI `text-embedding-3-small`, `batch_size=100` | 1536-dim vectors |
+| 6 | Store | `VectorService.store_chunks` — SQLAlchemy + **asyncpg** + pgvector | `document_chunks` rows with `embedding` column |
+| 7 | Complete | `document.status = "ready"` | Document library UI shows ready (5s poll) |
+
+**Code map:** `ingest.py` → `DocumentService.save_upload` → `document_tasks.py` → `DocumentService.process_document`.
+
+### 8.2 Query Flow (Step by Step)
+
+| Step | Action | Tool | Output |
+|------|--------|------|--------|
+| 1 | Query | Chat UI → `POST /api/v1/query/stream` (SSE) or `POST /api/v1/query` (JSON) | Raw query string |
+| 2 | Embed query | `EmbeddingService` — `text-embedding-3-small` | 1536-dim vector |
+| 3 | Similarity search | pgvector `cosine_distance` (equivalent to `<=>`), top-10, org-scoped | Ranked `document_chunks` |
+| 4 | Rerank | Cohere `rerank-english-v3.0` → top-5 | Reordered chunks |
+| 5 | Grade | `gpt-4o-mini` scores each chunk 1–5 | Keep grade ≥ 3 only |
+| 6 | Generate | `gpt-4o` (or Anthropic if configured) with numbered context `[1]…[n]` | Answer with inline `[1]`, `[2]` markers |
+| 7 | Format | `format_citations` node | `{answer, citations: [{document_name, page, chunk_text}]}` |
+| 8 | Stream | `StreamingResponse` SSE `data: {"type":"token"}` … `done` | Word-by-word UI (`useQueryStream`) |
+| 9 | Log | `QueryLog` async insert | Analytics + optional human rating |
+
+**Optional:** Redis cache hit on identical query+org skips steps 2–7 (`cached: true`, &lt;50ms).
+
+**Code map:** `query.py` → `KnowledgeAgent.run` / `run_stream` → `_retrieve` → LangGraph (`rerank` → `grade` → `generate` → `format`).
+
+---
+
+## 9. Environment Variables Reference
+
+**Location:** repo root **`docs/ENVIRONMENT_VARIABLES.md`** (not under `frontend/` or `backend/` — shared by the whole monorepo).
+
+Index: **[docs/README.md](./README.md)**.
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `OPENAI_API_KEY` | Yes | GPT-4o + gpt-4o-mini + embeddings |
+| `DATABASE_URL` | Yes | `postgresql+asyncpg://...` |
+| `REDIS_URL` | Yes | Celery + RAG cache |
+| `ENCRYPTION_KEY` | Yes (prod) | Fernet for Settings UI secrets |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes (FE) | **Not** NextAuth |
+| `SUPABASE_JWT_SECRET` | Prod | API JWT verify |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional | Document storage (not `SUPABASE_SERVICE_KEY`) |
+| `COHERE_API_KEY` | Sprint 2 | Rerank |
+| `SLACK_*` / `DEFAULT_ORG_ID` | Sprint 3 | Webhooks + DMs |
+| Jira / SendGrid | Sprint 4 | **Admin Settings UI** (encrypted DB), not `JIRA_API_TOKEN` env |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Sprint 5 | Error tracking |
+
+Template: `docker/.env.example`.
+
+---
+
+## 10. cursor.md — AI Code Generation Rules
+
+- **Cursor (required):** [cursor.md](../cursor.md) at repository root  
+- **Readable copy:** [CURSOR_RULES.md](./CURSOR_RULES.md)
+
+Cursor loads root `cursor.md` as global context. Key corrections vs older master PDF:
+
+- **Redux Toolkit + hooks** (not Zustand)
+- **Next.js 16** App Router (not 14)
+- **Supabase Auth** (not NextAuth / `NEXTAUTH_*`)
+- Integration secrets in **DB** via `/settings`, not flat `JIRA_*` env vars
+
+---
+
+## 11. Testing Strategy
 
 | Test Type | Tool | What to Test | Coverage Target |
 |-----------|------|--------------|-----------------|
@@ -450,7 +549,7 @@ Environment prefix `FEATURE_`. Return 404 when disabled (e.g. Slack webhook).
 
 ---
 
-## 9. Sprint Plan
+## 12. Sprint Plan
 
 **Cadence:** 10 days per sprint  
 - Days 1–7: Development  
@@ -470,26 +569,27 @@ Sprint 1–2 must be **demoable** before advanced features.
 
 ---
 
-## 10. Database Schema
+## 13. Database Schema
 
 | Table | Key Columns | Notes |
 |-------|-------------|-------|
 | `users` | id, email, role, org_id | Roles: admin, manager, employee |
 | `organizations` | id, name, plan, settings_json | Multi-tenant from day one |
-| `documents` | id, org_id, filename, storage_url, status | pending / processing / ready / error |
+| `documents` | id, org_id, filename, storage_path, status | pending / processing / ready / error |
 | `document_chunks` | id, document_id, content, embedding vector(1536), chunk_index | pgvector search |
 | `queries` | id, user_id, query_text, answer_text, cited_chunks[], latency_ms | RAG audit log |
 | `tickets` | id, org_id, source, raw_payload, intent, priority, assignee_id, external_ticket_id | source: slack or email |
+| `org_integration_settings` | org_id, jira_*, sendgrid_* (encrypted), inbound_email_address | Per-org integration secrets |
 | `activity_logs` | id, user_id, action, resource_type, resource_id, timestamp | Full audit trail |
 
 ---
 
-## 11. LangGraph Agent Flows
+## 14. LangGraph Agent Flows
 
 ### Knowledge Agent
 
 ```
-START → parse_query → retrieve_chunks → grade_relevance → generate_answer → format_citations → END
+START → parse_query → retrieve_chunks → rerank_chunks → grade_relevance → generate_answer → format_citations → END
                               ↓ (errors)
                         handle_error → END
 ```
@@ -505,17 +605,18 @@ START → parse_webhook_payload → classify_intent → determine_priority → a
 
 ---
 
-## Appendix: Quick Reference for Agents
+## 15. Appendix: Quick Reference for Agents
 
 When implementing a task:
 
-1. Read **§1 Current Progress** first.
+1. Read **§1 Current Progress** and root **`cursor.md`** first.
 2. Gate new UI behind **§7 feature flags**.
-3. Follow **atomic design** and **hook-only** component access (**§5, §6**).
-4. Use **Redux only via feature hooks** — never `useSelector` in components.
-5. Keep server/RAG state in **hooks**, not Redux slices.
-6. Backend: routers → services → repositories/agents (**§4.3**).
-7. Update **§1.1 / §1.2** checkboxes when completing sprint work.
+3. Env vars: **`docs/ENVIRONMENT_VARIABLES.md`** (§9).
+4. Follow **atomic design** and **hook-only** component access (**§5, §6**).
+5. Use **Redux only via feature hooks** — never `useSelector` in components.
+6. Keep server/RAG state in **hooks**, not Redux slices.
+7. Backend: routers → services → repositories/agents (**§4.3**).
+8. Update **§1.1 / §1.2** checkboxes when completing sprint work.
 
 ---
 

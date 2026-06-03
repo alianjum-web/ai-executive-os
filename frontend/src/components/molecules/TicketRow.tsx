@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge } from "@/components/atoms/Badge";
 import type { TicketRecord } from "@/lib/api";
 
@@ -18,7 +19,11 @@ export function TicketRow({ ticket }: { ticket: TicketRecord }) {
   return (
     <tr className="border-t border-zinc-100 hover:bg-zinc-50/80">
       <td className="px-4 py-3">
-        <p className="font-medium text-zinc-900">{ticket.summary ?? "—"}</p>
+        <Link href={`/tickets/${ticket.id}`} className="block">
+          <p className="font-medium text-zinc-900 hover:underline">
+            {ticket.summary ?? "—"}
+          </p>
+        </Link>
         <p className="mt-0.5 text-xs text-zinc-500 capitalize">
           {ticket.intent?.replace(/_/g, " ") ?? "unknown"}
         </p>
@@ -33,7 +38,14 @@ export function TicketRow({ ticket }: { ticket: TicketRecord }) {
       <td className="px-4 py-3">
         <Badge status={ticket.status} />
       </td>
-      <td className="px-4 py-3 capitalize text-zinc-700">{ticket.source}</td>
+      <td className="px-4 py-3 capitalize text-zinc-700">
+        {ticket.source}
+        {ticket.external_ticket_id && (
+          <span className="ml-1 font-mono text-xs text-zinc-500">
+            {ticket.external_ticket_id}
+          </span>
+        )}
+      </td>
       <td className="px-4 py-3 text-zinc-600">
         {ticket.assignee_email ?? "Unassigned"}
       </td>

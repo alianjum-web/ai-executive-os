@@ -32,7 +32,28 @@ class User(Base):
     )
     slack_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     department: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    jira_account_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class OrgIntegrationSettings(Base):
+    __tablename__ = "org_integration_settings"
+
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id"), primary_key=True
+    )
+    jira_site_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    jira_project_key: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    jira_client_id_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    jira_client_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    jira_access_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    jira_refresh_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sendgrid_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sendgrid_from_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    inbound_email_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class AssigneeMapping(Base):
@@ -70,6 +91,9 @@ class Ticket(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     assignee: Mapped["User | None"] = relationship(
@@ -123,6 +147,7 @@ class QueryLog(Base):
     cited_chunks: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     cited_chunk_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    accuracy_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
