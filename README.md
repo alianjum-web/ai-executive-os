@@ -100,7 +100,16 @@ cd frontend && npm test       # Jest (atoms, CitationCard)
 cd frontend && npm run test:e2e # Playwright (set E2E_RUN_LIVE=1 for live stack)
 ```
 
-## Feature flags (Sprint 2)
+## Slack setup (Sprint 3)
+
+1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps)  
+2. Enable **Event Subscriptions** → Request URL: `https://<your-api>/api/v1/webhook/slack`  
+3. Subscribe to `message.channels` (or `message.groups` / `message.im` as needed)  
+4. Copy **Signing Secret** → `SLACK_SIGNING_SECRET`  
+5. Add Bot Token Scopes: `chat:write`, `im:write` → install app → `SLACK_BOT_TOKEN`  
+6. Set `DEFAULT_ORG_ID` to your Supabase `user_metadata.org_id` for webhook routing  
+
+## Feature flags (Sprint 2–3)
 
 | Flag | Default |
 |------|---------|
@@ -109,6 +118,15 @@ cd frontend && npm run test:e2e # Playwright (set E2E_RUN_LIVE=1 for live stack)
 | `BASIC_AUTH_ENABLED` | true |
 | `MULTI_TENANT_ENABLED` | true |
 | `ANALYTICS_DASHBOARD_ENABLED` | true (admin dashboard) |
+| `PROJECT_AGENT_ENABLED` | true |
+| `SLACK_WEBHOOK_ENABLED` | true |
+
+## API — Sprint 3
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/webhook/slack` | Slack Events API (HMAC verified) |
+| `GET` | `/api/v1/tickets` | Org-scoped ticket feed |
 
 ## RAG pipeline (Sprint 2)
 

@@ -18,5 +18,13 @@ class FeatureFlags:
     def ANALYTICS_DASHBOARD_ENABLED(self) -> bool:
         return settings.feature_analytics_dashboard_enabled
 
+    @property
+    def PROJECT_AGENT_ENABLED(self) -> bool:
+        return settings.feature_project_agent_enabled
+
+    @property
+    def SLACK_WEBHOOK_ENABLED(self) -> bool:
+        return settings.feature_slack_webhook_enabled
+
 
 flags = FeatureFlags()

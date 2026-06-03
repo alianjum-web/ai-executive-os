@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     feature_document_upload_enabled: bool = True
     feature_multi_tenant_enabled: bool = True
     feature_analytics_dashboard_enabled: bool = True
+    feature_project_agent_enabled: bool = Field(default=True, validation_alias="FEATURE_PROJECT_AGENT_ENABLED")
+    feature_slack_webhook_enabled: bool = Field(default=True, validation_alias="FEATURE_SLACK_WEBHOOK_ENABLED")
+
+    slack_signing_secret: str = Field(default="", validation_alias="SLACK_SIGNING_SECRET")
+    slack_bot_token: str = Field(default="", validation_alias="SLACK_BOT_TOKEN")
+    default_org_id: str = Field(default="", validation_alias="DEFAULT_ORG_ID")
+    slack_webhook_max_age_seconds: int = 60 * 5
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -33,6 +33,20 @@ export type AnalyticsDashboard = {
   top_questions: { question: string; count: number }[];
 };
 
+export type TicketRecord = {
+  id: string;
+  source: string;
+  intent: string | null;
+  priority: number | null;
+  summary: string | null;
+  department: string | null;
+  status: string;
+  assignee_email: string | null;
+  assignee_id: string | null;
+  slack_channel_id: string | null;
+  created_at: string;
+};
+
 async function authFetch(url: string, init?: RequestInit) {
   const headers = await getAuthHeaders();
   const res = await fetch(url, {
@@ -89,5 +103,10 @@ export async function fetchAnalytics(): Promise<AnalyticsDashboard> {
   const res = await authFetch(`${API_BASE}/analytics/dashboard`, {
     cache: "no-store",
   });
+  return res.json();
+}
+
+export async function listTickets(): Promise<TicketRecord[]> {
+  const res = await authFetch(`${API_BASE}/tickets`, { cache: "no-store" });
   return res.json();
 }

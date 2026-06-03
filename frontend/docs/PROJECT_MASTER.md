@@ -53,6 +53,14 @@ Use this section to track where we are. Update it as sprints complete.
 
 ### 1.2 Active Sprint
 
+**Sprint 3 — Project Agent & Slack** — Complete
+
+- [x] `POST /api/v1/webhook/slack` with HMAC-SHA256 + url_verification
+- [x] LangGraph Project Agent (classify → priority → assign → ticket → Slack DM)
+- [x] Assignee mapping + round-robin by department
+- [x] Tickets API + `/tickets` UI (TicketRow, TicketFeed, 5s polling)
+- [x] `PROJECT_AGENT_ENABLED` + `SLACK_WEBHOOK_ENABLED` flags enabled
+
 **Sprint 2 — RAG Quality, Multi-Tenancy & Dashboard** — Complete
 
 - [x] LangGraph relevance grading (drop chunks graded ≤2)

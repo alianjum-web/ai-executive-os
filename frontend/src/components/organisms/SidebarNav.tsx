@@ -16,6 +16,12 @@ const links = [
     adminOnly: true,
   },
   { href: "/chat", label: "Chat", flag: "KNOWLEDGE_AGENT_ENABLED" as const, adminOnly: false },
+  {
+    href: "/tickets",
+    label: "Tickets",
+    flag: "PROJECT_AGENT_ENABLED" as const,
+    adminOnly: false,
+  },
 ];
 
 export function SidebarNav() {
@@ -24,11 +30,13 @@ export function SidebarNav() {
   const { isAdmin } = useRole();
   const documentUploadEnabled = useFeatureFlag("DOCUMENT_UPLOAD_ENABLED");
   const knowledgeEnabled = useFeatureFlag("KNOWLEDGE_AGENT_ENABLED");
+  const projectAgentEnabled = useFeatureFlag("PROJECT_AGENT_ENABLED");
 
   const flagEnabled = (flag?: (typeof links)[number]["flag"]) => {
     if (!flag) return true;
     if (flag === "DOCUMENT_UPLOAD_ENABLED") return documentUploadEnabled;
     if (flag === "KNOWLEDGE_AGENT_ENABLED") return knowledgeEnabled;
+    if (flag === "PROJECT_AGENT_ENABLED") return projectAgentEnabled;
     return true;
   };
 

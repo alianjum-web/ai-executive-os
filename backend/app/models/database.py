@@ -30,7 +30,51 @@ class User(Base):
     org_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True
     )
+    slack_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    department: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AssigneeMapping(Base):
+    __tablename__ = "assignee_mappings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False
+    )
+    department: Mapped[str] = mapped_column(String(64), nullable=False)
+    user_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
+    round_robin_index: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True
+    )
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    raw_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    intent: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    department: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    assignee_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(32), default="open")
+    external_ticket_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    slack_channel_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    slack_message_ts: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    assignee: Mapped["User | None"] = relationship(
+        "User", foreign_keys=[assignee_id], lazy="selectin"
+    )
 
 
 class Document(Base):

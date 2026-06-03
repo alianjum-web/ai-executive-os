@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routers import analytics, health, ingest, query
+from app.api.v1.routers import analytics, health, ingest, query, tickets, webhooks
 from app.core.config import settings
 
 API_DESCRIPTION = """
@@ -20,6 +20,10 @@ For local dev without JWT secret, use headers: `X-Org-Id`, `X-User-Id`, `X-User-
 - `POST /api/v1/query/stream` — SSE token streaming with citations on `done` event
 - `GET /api/v1/analytics/dashboard` — admin metrics (requires admin role)
 - `DELETE /api/v1/documents/{id}` — cascade delete chunks/embeddings
+
+### Sprint 3 — Project Agent
+- `POST /api/v1/webhook/slack` — Slack Events API (url_verification + message.channels)
+- `GET /api/v1/tickets` — Ticket feed (org-scoped)
 """
 
 
@@ -30,7 +34,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="SOP Automator API",
-    version="2.0.0",
+    version="3.0.0",
     description=API_DESCRIPTION,
     lifespan=lifespan,
     docs_url="/docs",
@@ -51,3 +55,5 @@ app.include_router(health.router, prefix=api_prefix, tags=["health"])
 app.include_router(ingest.router, prefix=api_prefix, tags=["documents"])
 app.include_router(query.router, prefix=api_prefix, tags=["knowledge"])
 app.include_router(analytics.router, prefix=api_prefix, tags=["analytics"])
+app.include_router(webhooks.router, prefix=api_prefix, tags=["webhooks"])
+app.include_router(tickets.router, prefix=api_prefix, tags=["tickets"])

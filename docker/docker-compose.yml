@@ -35,6 +35,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/sop_automator
       REDIS_URL: redis://redis:6379/0
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      DEFAULT_ORG_ID: ${DEFAULT_ORG_ID:-}
       CORS_ORIGINS: http://localhost:3000
       UPLOAD_DIR: /tmp/uploads
     volumes:
@@ -56,6 +59,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/sop_automator
       REDIS_URL: redis://redis:6379/0
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      DEFAULT_ORG_ID: ${DEFAULT_ORG_ID:-}
       UPLOAD_DIR: /tmp/uploads
     volumes:
       - uploads_data:/tmp/uploads

@@ -21,3 +21,4 @@ pytest-asyncio>=0.21.0
 greenlet>=3.0.0
 PyJWT>=2.8.0
 cohere>=5.0.0
+slack_sdk>=3.27.0
