@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+build/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.env*.local
+*.pem
+.DS_Store
+/tmp/uploads/

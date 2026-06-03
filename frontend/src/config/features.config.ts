@@ -1,0 +1,10 @@
+export const FEATURE_FLAGS = {
+  KNOWLEDGE_AGENT_ENABLED: true,
+  DOCUMENT_UPLOAD_ENABLED: true,
+  BASIC_AUTH_ENABLED: true,
+  PROJECT_AGENT_ENABLED: false,
+  SLACK_WEBHOOK_ENABLED: false,
+  EMAIL_WEBHOOK_ENABLED: false,
+} as const;
+
+export type FeatureFlag = keyof typeof FEATURE_FLAGS;
