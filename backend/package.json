@@ -1,0 +1,22 @@
+{
+  "name": "ai-executive-os-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "npm scripts wrap Python dev commands (like frontend package.json). Requires .venv — run npm run setup once.",
+  "scripts": {
+    "setup": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && npm install",
+    "deps:docker": "docker compose -f ../docker/docker-compose.yml up -d postgres",
+    "deps:docker:all": "docker compose -f ../docker/docker-compose.yml up -d postgres redis",
+    "db:migrate": ".venv/bin/alembic upgrade head",
+    "db:check": ".venv/bin/python scripts/check_services.py",
+    "api": ".venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "worker": ".venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info",
+    "predev": "npm run db:check && npm run db:migrate",
+    "dev": "npm run predev && concurrently -k -n api,worker -c blue,magenta \"npm run api\" \"npm run worker\"",
+    "dev:api": "npm run predev && npm run api",
+    "bootstrap": "npm run deps:docker && npm run setup && npm run db:migrate"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

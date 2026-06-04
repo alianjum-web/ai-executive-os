@@ -16,11 +16,11 @@ Engineering master guide §9, aligned with **`backend/app/core/config.py`**.
 | `SUPABASE_URL` | **Yes**† | Supabase project URL | [supabase.com](https://supabase.com) dashboard | Backend storage; use `NEXT_PUBLIC_SUPABASE_URL` in frontend |
 | `SUPABASE_SERVICE_KEY` | — | *(PDF name)* | — | Use **`SUPABASE_SERVICE_ROLE_KEY`** instead |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Yes**† | Supabase admin key for storage | Dashboard → Settings → API → `service_role` | Optional; else local `UPLOAD_DIR` |
-| `NEXTAUTH_SECRET` | — | *(PDF)* NextAuth JWT signing | — | Use **`SUPABASE_JWT_SECRET`** (Supabase Auth) |
+| `NEXTAUTH_SECRET` | — | *(PDF)* NextAuth JWT signing | — | Supabase Auth JWTs verified via **`SUPABASE_URL`** (JWKS) |
 | `NEXTAUTH_URL` | — | *(PDF)* Next.js base URL | — | Use app URL + **`NEXT_PUBLIC_SUPABASE_URL`** |
 | `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | Supabase URL (browser) | Supabase dashboard | Frontend auth |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | Supabase anon key | Supabase dashboard | Frontend auth |
-| `SUPABASE_JWT_SECRET` | Prod | Verify API JWTs | Supabase → JWT secret | Backend |
+| `SUPABASE_JWT_SECRET` | — | *(deprecated)* Legacy HS256 verify only | Supabase → JWT Settings → Legacy JWT secret | Omit if using asymmetric signing keys |
 | `NEXT_PUBLIC_API_URL` | **Yes** | API base for frontend | e.g. `http://localhost:8000/api/v1` | Frontend |
 | `SLACK_BOT_TOKEN` | Sprint 3 | Slack bot OAuth for DMs | [api.slack.com](https://api.slack.com) → App credentials | Same |
 | `SLACK_SIGNING_SECRET` | Sprint 3 | Slack webhook HMAC | Same | Same |
@@ -103,6 +103,6 @@ Requires `ENCRYPTION_KEY` on the API.
 | Engineering PDF | Use in this repo |
 |-----------------|------------------|
 | `SUPABASE_SERVICE_KEY` | `SUPABASE_SERVICE_ROLE_KEY` |
-| `NEXTAUTH_SECRET` | `SUPABASE_JWT_SECRET` |
+| `NEXTAUTH_SECRET` | `SUPABASE_URL` (JWKS JWT verify) |
 | `NEXTAUTH_URL` | `NEXT_PUBLIC_SUPABASE_URL` + deployment URL |
 | `JIRA_*` / `SENDGRID_API_KEY` | Admin **Settings** UI |

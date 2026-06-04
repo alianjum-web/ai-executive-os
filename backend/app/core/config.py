@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 
     database_url: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/sop_automator",
+        default="postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/sop_automator",
         validation_alias="DATABASE_URL",
     )
     redis_url: str = Field(default="redis://localhost:6379/0", validation_alias="REDIS_URL")
@@ -37,6 +37,7 @@ class Settings(BaseSettings):
         default=0.1, validation_alias="SENTRY_TRACES_SAMPLE_RATE"
     )
     rag_cache_ttl_seconds: int = Field(default=3600, validation_alias="RAG_CACHE_TTL_SECONDS")
+    # Deprecated: only for projects still on legacy HS256 JWTs. Prefer JWKS via SUPABASE_URL.
     supabase_jwt_secret: str = Field(default="", validation_alias="SUPABASE_JWT_SECRET")
     openai_chat_model: str = Field(default="gpt-4o", validation_alias="OPENAI_CHAT_MODEL")
     openai_grading_model: str = Field(
@@ -90,6 +91,24 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def supabase_jwks_url(self) -> str:
+        base = self.supabase_url.rstrip("/")
+        if not base:
+            return ""
+        return f"{base}/auth/v1/.well-known/jwks.json"
+
+    @property
+    def supabase_jwt_issuer(self) -> str:
+        base = self.supabase_url.rstrip("/")
+        if not base:
+            return ""
+        return f"{base}/auth/v1"
+
+    @property
+    def is_development(self) -> bool:
+        return self.app_env.lower() in ("development", "dev", "local")
 
 
 settings = Settings()

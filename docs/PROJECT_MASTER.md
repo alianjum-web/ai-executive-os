@@ -509,7 +509,7 @@ Index: **[docs/README.md](./README.md)**.
 | `REDIS_URL` | Yes | Celery + RAG cache |
 | `ENCRYPTION_KEY` | Yes (prod) | Fernet for Settings UI secrets |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes (FE) | **Not** NextAuth |
-| `SUPABASE_JWT_SECRET` | Prod | API JWT verify |
+| `SUPABASE_URL` | Prod | API JWT verify via JWKS (`/auth/v1/.well-known/jwks.json`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | Document storage (not `SUPABASE_SERVICE_KEY`) |
 | `COHERE_API_KEY` | Sprint 2 | Rerank |
 | `SLACK_*` / `DEFAULT_ORG_ID` | Sprint 3 | Webhooks + DMs |

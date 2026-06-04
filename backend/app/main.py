@@ -14,7 +14,7 @@ Knowledge Agent (RAG), document ingestion, multi-tenant org isolation, and admin
 ### Authentication
 Send `Authorization: Bearer <supabase_jwt>` with `user_metadata.org_id` and `user_metadata.role`.
 
-For local dev without JWT secret, use headers: `X-Org-Id`, `X-User-Id`, `X-User-Role` (`admin` | `employee`).
+For local dev (`APP_ENV=development`), you may use headers: `X-Org-Id`, `X-User-Id`, `X-User-Role` (`admin` | `employee`). Production requires a verified Supabase JWT (`SUPABASE_URL` + JWKS).
 
 ### Sprint 2 endpoints
 - `POST /api/v1/query/stream` — SSE token streaming with citations on `done` event

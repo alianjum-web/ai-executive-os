@@ -8,7 +8,7 @@ from app.models.database import Base
 
 config = context.config
 sync_url = settings.database_url.replace("+asyncpg", "")
-config.set_main_option("sqlalchemy.url", sync_url)
+# Do not call set_main_option with the URL — ConfigParser treats % as interpolation.
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

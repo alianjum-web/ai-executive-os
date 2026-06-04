@@ -5,8 +5,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: sop_automator
+    # Host 5433 avoids conflict with a system Postgres often bound to 127.0.0.1:5432
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,8 +18,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Host 6380 avoids conflict with a local Redis often bound to 6379
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

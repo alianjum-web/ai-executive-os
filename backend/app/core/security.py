@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.feature_flags import flags
+from app.core.supabase_jwt import decode_supabase_access_token
 from app.models.database import User
 
 
@@ -18,20 +19,6 @@ class AuthContext:
     org_id: uuid.UUID
     role: str
     email: str | None = None
-
-
-def _decode_supabase_jwt(token: str) -> dict:
-    if not settings.supabase_jwt_secret:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="JWT secret not configured",
-        )
-    return jwt.decode(
-        token,
-        settings.supabase_jwt_secret,
-        algorithms=["HS256"],
-        audience="authenticated",
-    )
 
 
 def _auth_from_headers(
@@ -56,14 +43,11 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> AuthContext:
     dev_auth = _auth_from_headers(x_org_id, x_user_id, x_user_role)
-    if dev_auth and not settings.supabase_jwt_secret:
+    if dev_auth and settings.is_development:
         await _ensure_user_row(db, dev_auth)
         return dev_auth
 
     if not authorization or not authorization.startswith("Bearer "):
-        if dev_auth:
-            await _ensure_user_row(db, dev_auth)
-            return dev_auth
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing bearer token",
@@ -71,10 +55,7 @@ async def get_current_user(
 
     token = authorization.removeprefix("Bearer ").strip()
     try:
-        if settings.supabase_jwt_secret:
-            payload = _decode_supabase_jwt(token)
-        else:
-            payload = jwt.decode(token, options={"verify_signature": False})
+        payload = decode_supabase_access_token(token)
     except jwt.PyJWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
