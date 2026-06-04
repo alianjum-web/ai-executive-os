@@ -1,10 +1,10 @@
-import { DashboardContent } from "@/app/dashboard/DashboardContent";
-import { DashboardTemplate } from "@/components/templates/DashboardTemplate";
+import { DashboardScreen } from "@/dashboard/screens/DashboardScreen";
+import { DashboardTemplate } from "@/common/organisms/DashboardTemplate";
 
 export default function DashboardPage() {
   return (
-    <DashboardTemplate title="Dashboard">
-      <DashboardContent />
+    <DashboardTemplate title="Command center">
+      <DashboardScreen />
     </DashboardTemplate>
   );
 }

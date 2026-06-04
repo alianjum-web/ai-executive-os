@@ -1,13 +1,5 @@
-import { DocumentLibrary } from "@/components/organisms/DocumentLibrary";
-import { DashboardTemplate } from "@/components/templates/DashboardTemplate";
-import { RoleGuard } from "@/components/guards/RoleGuard";
+import { KnowledgeScreen } from "@/knowledge/screens/KnowledgeScreen";
 
 export default function KnowledgePage() {
-  return (
-    <DashboardTemplate title="Knowledge Base">
-      <RoleGuard allowedRoles={["admin"]}>
-        <DocumentLibrary />
-      </RoleGuard>
-    </DashboardTemplate>
-  );
+  return <KnowledgeScreen />;
 }

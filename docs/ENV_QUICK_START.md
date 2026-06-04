@@ -79,7 +79,7 @@ Set `"ai_provider"` in `backend/config/features.json` (`gemini`, `groq`, `openai
 | `docker/.env.local.example` | Full stack local Docker |
 | `docker/.env.production.example` | Full stack production Docker |
 
-See also: [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md)
+See also: [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) · **[DEV_VS_PRODUCTION.md](./DEV_VS_PRODUCTION.md)** (check dev/prod, use `.env.production`)
 
 ---
 

@@ -1,0 +1,106 @@
+"use client";
+
+import { useEffect } from "react";
+import { FileText } from "lucide-react";
+import { Badge } from "@/common/atoms/Badge";
+import { FileUploadCard } from "@/knowledge/molecules/FileUploadCard";
+import { Button } from "@/common/atoms/ui/button";
+import { Card } from "@/common/atoms/ui/card";
+import { deleteDocument } from "@/common/services/api/client";
+import { useDocumentUpload } from "@/knowledge/hooks/useDocumentUpload";
+import { useRole } from "@/common/hooks/useRole";
+import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
+import { ErrorState } from "@/common/molecules/ErrorState";
+import { EmptyState } from "@/common/molecules/EmptyState";
+import { LoadingBlock } from "@/common/molecules/LoadingBlock";
+
+export function DocumentLibrary() {
+  const uploadEnabled = useFeatureFlag("DOCUMENT_UPLOAD_ENABLED");
+  const { isAdmin } = useRole();
+  const { documents, isUploading, error, upload, refresh, isLoading } =
+    useDocumentUpload();
+
+  const handleDelete = async (id: string) => {
+    await deleteDocument(id);
+    await refresh();
+  };
+
+  useEffect(() => {
+    refresh().catch(() => undefined);
+    const interval = setInterval(() => refresh().catch(() => undefined), 5000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  if (!uploadEnabled) return null;
+
+  return (
+    <div className="space-y-6">
+      <FileUploadCard onUpload={upload} isUploading={isUploading} />
+      {error ? <ErrorState message={error} onRetry={() => refresh()} /> : null}
+
+      {isLoading && documents.length === 0 ? (
+        <LoadingBlock rows={4} label="Loading documents" />
+      ) : documents.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="No documents yet"
+          description="Upload your first SOP or policy document to power the knowledge agent."
+        />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-border bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3.5 font-medium" scope="col">
+                    Filename
+                  </th>
+                  <th className="px-4 py-3.5 font-medium" scope="col">
+                    Status
+                  </th>
+                  <th className="px-4 py-3.5 font-medium" scope="col">
+                    Uploaded
+                  </th>
+                  {isAdmin ? (
+                    <th className="px-4 py-3.5 font-medium" scope="col">
+                      Actions
+                    </th>
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody>
+                {documents.map((doc) => (
+                  <tr
+                    key={doc.id}
+                    className="border-t border-border-subtle transition-colors hover:bg-muted/40"
+                  >
+                    <td className="px-4 py-3.5 font-medium text-foreground">
+                      {doc.filename}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <Badge status={doc.status} />
+                    </td>
+                    <td className="px-4 py-3.5 text-muted-foreground">
+                      {new Date(doc.created_at).toLocaleString()}
+                    </td>
+                    {isAdmin ? (
+                      <td className="px-4 py-3.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(doc.id)}
+                        >
+                          Delete
+                        </Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}

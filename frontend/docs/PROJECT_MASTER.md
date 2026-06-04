@@ -46,7 +46,7 @@ Use this section to track where we are. Update it as sprints complete.
 | Backend | Done | FastAPI ingest/query, LangGraph Knowledge Agent, Celery worker |
 | PostgreSQL + pgvector | Done | Docker + Alembic migration `001` |
 | Redux Toolkit | Done | Slices behind `useSidebar`, `useChat`, `useUser` hooks |
-| Feature flags | Done | `src/config/features.config.ts` + backend flags |
+| Feature flags | Done | `src/common/config/features.config.ts` + backend flags |
 | Auth | Done | **Supabase Auth** (email/password) — see `frontend/.env.example` |
 | Knowledge Agent (RAG) | Done | MVP: upload → embed → query with citations |
 | Project Agent (routing) | Not started | Sprint 3+ |
@@ -193,47 +193,11 @@ Target layout (adapt as we scaffold):
 
 ```
 src/
-  app/                          # Next.js App Router pages
-    (auth)/login/page.tsx
-    dashboard/page.tsx
-    knowledge/page.tsx
-    chat/page.tsx
-    tickets/page.tsx
-    settings/page.tsx
-    layout.tsx
-  components/
-    atoms/                      # Button, Input, Badge, Spinner, Icon
-    molecules/                  # SearchBar, FileUploadCard, ChatBubble
-    organisms/                  # ChatWindow, DocumentLibrary, SidebarNav
-    templates/                  # DashboardTemplate, SettingsTemplate
-  hooks/                        # Data + state adapter layer (ONLY interface for UI)
-    useKnowledgeQuery.ts        # Chat + RAG (server state)
-    useDocumentUpload.ts
-    useTickets.ts
-    useFeatureFlag.ts
-    useSidebar.ts               # Redux-backed UI state
-    useChat.ts
-    useUser.ts
-    useNotifications.ts
-  lib/
-    api.ts                      # Typed API client
-    auth.ts
-    utils.ts
-  store/                        # Redux Toolkit (NOT imported by components)
-    index.ts
-    hooks.ts                    # typed useAppDispatch / useAppSelector (internal)
-    slices/
-      uiSlice.ts
-      chatSlice.ts
-      ticketSlice.ts
-      userSlice.ts
-  types/
-    api.types.ts
-    domain.types.ts
-  config/
-    features.config.ts
-  styles/
-    globals.css
+  app/                          # Next.js routes only (thin pages → module screens)
+  common/                       # Shared atoms→organisms, hooks, state, store, services, lib/, config/
+  auth/ | chat/ | dashboard/ | knowledge/ | tickets/ | welcome/
+    atoms/ | molecules/ | organisms/ | screens/ | hooks/ | state/
+    services/                   # e.g. auth/services; API/Supabase in common/services/
 ```
 
 > **Note:** Original master doc listed `stores/` with Zustand. We use `store/` + Redux slices instead. Components never import from `store/` directly.
@@ -348,7 +312,7 @@ const { isOpen, toggle } = useSidebar();
 | `useUser()` | `userSlice` | Session display state |
 | `useNotifications()` | `uiSlice` (or dedicated slice) | Toast/queue |
 
-Only these hooks are imported by React components under `components/` and `app/`.
+Only these hooks are imported by React components under feature folders (`auth/`, `chat/`, …) and thin `app/` pages.
 
 ### 6.4 Slice Rules
 
@@ -393,7 +357,7 @@ Treat Redux as an **internal implementation detail**. Components behave as if st
 
 Implement from Sprint 1. Enables safe rollouts, instant rollback, per-org demos, and gradual rollout.
 
-### 7.1 Frontend — `src/config/features.config.ts`
+### 7.1 Frontend — `src/common/config/features.config.ts`
 
 ```ts
 export const FEATURE_FLAGS = {

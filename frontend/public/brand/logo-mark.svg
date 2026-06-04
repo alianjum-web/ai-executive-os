@@ -1,0 +1,11 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AI Executive OS">
+  <rect width="40" height="40" rx="10" fill="url(#eo-gradient)"/>
+  <path d="M12 26V14h4.2l3.1 7.2L22.4 14H26.5v12h-3.4v-7.1l-3.3 7.1h-2.1l-3.3-7.1V26H12z" fill="#F8FAFC"/>
+  <circle cx="30" cy="12" r="3" fill="#8B5CF6" opacity="0.95"/>
+  <defs>
+    <linearGradient id="eo-gradient" x1="8" y1="4" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F8CFF"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+</svg>

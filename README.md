@@ -15,13 +15,14 @@ Monorepo for an AI-powered executive operating system: document ingest (RAG), st
 5. [First-time setup](#first-time-setup)
 6. [Every day — start the app](#every-day--start-the-app)
 7. [Health checks](#health-checks)
-8. [Backend commands (`backend/package.json`)](#backend-commands-backendpackagejson)
-9. [Frontend commands (`frontend/package.json`)](#frontend-commands-frontendpackagejson)
-10. [Alternative: full stack in Docker](#alternative-full-stack-in-docker)
-11. [How chat and auth work](#how-chat-and-auth-work)
-12. [Troubleshooting](#troubleshooting)
-13. [Tests and deeper docs](#tests-and-deeper-docs)
-14. [API reference (summary)](#api-reference-summary)
+8. [**Dev vs production — full guide**](#dev-vs-production--full-guide) ← check prod on laptop
+9. [Backend commands (`backend/package.json`)](#backend-commands-backendpackagejson)
+10. [Frontend commands (`frontend/package.json`)](#frontend-commands-frontendpackagejson)
+11. [Alternative: full stack in Docker](#alternative-full-stack-in-docker)
+12. [How chat and auth work](#how-chat-and-auth-work)
+13. [Troubleshooting](#troubleshooting)
+14. [Tests and deeper docs](#tests-and-deeper-docs)
+15. [API reference (summary)](#api-reference-summary)
 
 ---
 
@@ -129,6 +130,34 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from Supabase dashboard>
 ```
 
 Full variable list: [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md) · Quick copy-paste: [`docs/ENV_QUICK_START.md`](docs/ENV_QUICK_START.md)
+
+Production templates (commit-safe): `backend/.env.production.example`, `frontend/.env.production.example`
+
+---
+
+## Dev vs production — full guide
+
+**Read this when you want to test `APP_ENV=production` on your laptop** or compare dev vs prod checks.
+
+→ **[`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md)** (complete step-by-step, checklists, switching `.env` files)
+
+Quick commands:
+
+```bash
+# Verify development
+cd backend && npm run check:env && npm run db:check
+cd frontend && npm run dev
+
+# Verify production rules (before/after copying .env.production → .env)
+cd backend && npm run check:prod && npm run db:check
+```
+
+| Check | Command | Pass means |
+|-------|---------|------------|
+| Dev config | `npm run check:env` | `APP_ENV=development`, keys OK |
+| Prod config | `npm run check:prod` | Production rules satisfied |
+| DB + Redis | `npm run db:check` | Services reachable |
+| API up | `curl http://127.0.0.1:8000/api/v1/health` | HTTP 200 + healthy body |
 
 ---
 
@@ -265,6 +294,8 @@ All commands run from **`backend/`** directory.
 | `npm run deps:docker:all` | As needed | Postgres + Redis container (Redis on **6380**) |
 | `npm run db:migrate` | Auto in `dev` | `alembic upgrade head` |
 | `npm run db:check` | Auto in `dev` | Test Postgres + Redis from `.env` |
+| `npm run check:env` | Anytime | Validate development env |
+| `npm run check:prod` | Before prod test | Validate production env |
 | `npm run dev` | **Daily** | `db:check` → `db:migrate` → API `--reload` + Celery |
 | `npm run dev:api` | Daily | Same preflight, API only (no Celery) |
 | `npm run api` | — | Uvicorn only |
@@ -359,6 +390,7 @@ cd frontend && npm run test:e2e   # optional live stack: E2E_RUN_LIVE=1
 
 | Document | Content |
 |----------|---------|
+| [`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md) | **Dev vs prod checks, `.env.production`, local prod test** |
 | [`docs/PROJECT_MASTER.md`](docs/PROJECT_MASTER.md) | Product vision, architecture, sprints |
 | [`docs/ENV_QUICK_START.md`](docs/ENV_QUICK_START.md) | Env templates + full-app start |
 | [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md) | All env vars |

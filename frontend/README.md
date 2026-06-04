@@ -1,38 +1,57 @@
-# Internal SOP Automator
+# Frontend (Next.js)
 
-AI-Powered Executive Operating System — Knowledge Agent (RAG) + Project Agent (event-driven ticket routing).
+Web UI: Supabase auth, RAG chat (SSE), document upload, analytics.
 
-**Engineering master doc (vision, architecture, sprints, Redux rules):** [docs/PROJECT_MASTER.md](./docs/PROJECT_MASTER.md)
+**Complete setup:** [`../README.md`](../README.md) · **Dev vs production checks:** [`../docs/DEV_VS_PRODUCTION.md`](../docs/DEV_VS_PRODUCTION.md)
 
-## Getting Started
-
-First, run the development server:
+## First time only
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd frontend
+cp .env.example .env.local
+# Edit: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Backend must be running — see [`../backend/README.md`](../backend/README.md).
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+## Every dev session
 
-## Learn More
+```bash
+cd frontend
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open http://localhost:3000
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Check development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. `npm run dev` → http://localhost:3000 loads  
+2. Sign in (Supabase)  
+3. Chat sends a message (backend must be on :8000)
 
-## Deploy on Vercel
+## Check production (laptop)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+cp .env.production.example .env.production   # first time, fill values
+npm run build
+npm run start
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Use `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1` when testing against a local backend. Full steps: [`../docs/DEV_VS_PRODUCTION.md`](../docs/DEV_VS_PRODUCTION.md).
+
+## Scripts
+
+| Command | When |
+|---------|------|
+| `npm install` | First time |
+| `npm run dev` | Daily — development UI (:3000) |
+| `npm run build` | Production build |
+| `npm run start` | Serve production build |
+| `npm test` | Jest |
+| `npm run test:e2e` | Playwright |
+
+## Docs
+
+- [docs/PROJECT_MASTER.md](./docs/PROJECT_MASTER.md) — frontend architecture and conventions
+- [../docs/ENV_QUICK_START.md](../docs/ENV_QUICK_START.md) — environment variables

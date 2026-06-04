@@ -9,6 +9,8 @@
     "deps:docker:all": "docker compose -f ../docker/docker-compose.yml up -d postgres redis",
     "db:migrate": ".venv/bin/alembic upgrade head",
     "db:check": ".venv/bin/python scripts/check_services.py",
+    "check:env": ".venv/bin/python scripts/validate_env.py",
+    "check:prod": ".venv/bin/python scripts/validate_env.py --production",
     "api": ".venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
     "worker": ".venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info",
     "predev": "npm run db:check && npm run db:migrate",

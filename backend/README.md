@@ -26,7 +26,15 @@ Default Docker credentials (see `docker/docker-compose.yml`):
 | `DATABASE_URL` | `postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/sop_automator` |
 | `REDIS_URL` | `redis://127.0.0.1:6379/0` (or `:6380` if using Docker Redis) |
 
-**Full onboarding:** see [`../README.md`](../README.md).
+**Full onboarding:** [`../README.md`](../README.md) · **Dev vs production checks:** [`../docs/DEV_VS_PRODUCTION.md`](../docs/DEV_VS_PRODUCTION.md)
+
+### Verify environment
+
+```bash
+npm run check:env    # development rules
+npm run check:prod   # production rules (use before prod test)
+npm run db:check     # Postgres + Redis reachable
+```
 
 Verify DB login:
 
@@ -46,6 +54,8 @@ Same idea as the frontend: one command runs a chain (`&&`) or parallel processes
 | `npm run deps:docker` | Start Postgres container (host port 5433) |
 | `npm run deps:docker:all` | Postgres + Redis (Redis on host 6380) |
 | `npm run db:check` | Preflight: test Postgres + Redis from `.env` |
+| `npm run check:env` | Validate development env |
+| `npm run check:prod` | Validate production env |
 | `npm run db:migrate` | `alembic upgrade head` |
 | `npm run dev` | Preflight + migrate → API (**reload**) + Celery worker |
 | `npm run dev:api` | Preflight + migrate → API only (no Celery) |

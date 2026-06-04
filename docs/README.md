@@ -21,6 +21,7 @@ Frontend and backend both link here — we do **not** copy the same tables into 
 | [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) | Release | Sprint 5 security checklist |
 | [FEATURE_FLAGS.md](./FEATURE_FLAGS.md) | Professor / devs | Minimal feature flags + AI provider format |
 | [ENV_QUICK_START.md](./ENV_QUICK_START.md) | Devs | Which `.env` file to copy for local vs production |
+| [DEV_VS_PRODUCTION.md](./DEV_VS_PRODUCTION.md) | Devs | **How to check dev vs prod (backend + frontend), test `.env.production` on laptop** |
 
 ## Also at repo root
 
@@ -28,7 +29,9 @@ Frontend and backend both link here — we do **not** copy the same tables into 
 |------|--------|
 | [`../cursor.md`](../cursor.md) | **Required** for Cursor IDE (not inside `docs/`) |
 | [`../docker/.env.example`](../docker/.env.example) | Docker Compose env template |
-| [`../frontend/.env.example`](../frontend/.env.example) | Frontend-only `NEXT_PUBLIC_*` |
+| [`../frontend/.env.example`](../frontend/.env.example) | Frontend dev `NEXT_PUBLIC_*` |
+| [`../backend/.env.production.example`](../backend/.env.production.example) | Backend production template |
+| [`../frontend/.env.production.example`](../frontend/.env.production.example) | Frontend production template |
 | [`../README.md`](../README.md) | Quick start & architecture |
 
 ## Package READMEs (pointers only)
