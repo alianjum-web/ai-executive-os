@@ -24,7 +24,8 @@ export function validateLoginFields(email: string, password: string): FieldError
 export function validateSignupFields(
   email: string,
   password: string,
-  orgName: string
+  orgName: string,
+  fullName?: string
 ): FieldErrors {
   const errors = validateLoginFields(email, password);
 
@@ -32,6 +33,10 @@ export function validateSignupFields(
     errors.orgName = "Organization name is required.";
   } else if (orgName.trim().length < 2) {
     errors.orgName = "Organization name must be at least 2 characters.";
+  }
+
+  if (fullName !== undefined && fullName.trim().length < 2) {
+    errors.fullName = "Full name must be at least 2 characters.";
   }
 
   return errors;

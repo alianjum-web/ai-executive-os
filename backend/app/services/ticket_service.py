@@ -51,6 +51,7 @@ class TicketService:
         ticket = Ticket(
             org_id=org_id,
             source=source,
+            title=(summary[:255] if summary else None),
             raw_payload=raw_payload,
             intent=intent,
             priority=priority,

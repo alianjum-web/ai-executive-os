@@ -26,7 +26,7 @@ export function SignupScreen() {
     formState: { errors, isSubmitting },
   } = useForm<SignupFormValues>({
     resolver: signupResolver,
-    defaultValues: { email: "", password: "", orgName: "" },
+    defaultValues: { email: "", password: "", fullName: "", orgName: "" },
     mode: "onBlur",
   });
 
@@ -40,6 +40,7 @@ export function SignupScreen() {
         metadata: {
           org_id: crypto.randomUUID(),
           org_name: data.orgName,
+          full_name: data.fullName,
           role: "admin",
         },
       });
@@ -84,6 +85,13 @@ export function SignupScreen() {
               autoComplete="email"
               error={errors.email?.message}
               {...register("email")}
+            />
+            <Input
+              label="Full name"
+              autoComplete="name"
+              placeholder="Your name"
+              error={errors.fullName?.message}
+              {...register("fullName")}
             />
             <Input
               label="Password"

@@ -142,16 +142,20 @@ class KnowledgeAgent:
         user_id: uuid.UUID | None,
         org_id: uuid.UUID | None,
         latency_ms: int,
+        session_id: str | None = None,
+        model: str | None = None,
     ) -> None:
         log = QueryLog(
             user_id=user_id,
             org_id=org_id,
+            session_id=session_id,
             query_text=query,
             answer_text=answer,
             cited_chunks=[c.model_dump(mode="json") for c in citations],
             cited_chunk_ids=[
                 str(c.chunk_id) for c in citations if c.chunk_id is not None
             ],
+            model=model or settings.openai_chat_model,
             latency_ms=latency_ms,
         )
         db.add(log)
@@ -164,6 +168,7 @@ class KnowledgeAgent:
         *,
         user_id: uuid.UUID | None = None,
         org_id: uuid.UUID | None = None,
+        session_id: str | None = None,
     ) -> QueryResponse:
         start = time.perf_counter()
         chunk_items = await self._retrieve(db, query, org_id)
@@ -181,6 +186,7 @@ class KnowledgeAgent:
             user_id=user_id,
             org_id=org_id,
             latency_ms=latency_ms,
+            session_id=session_id,
         )
         return QueryResponse(answer=answer, citations=citations, latency_ms=latency_ms)
 
@@ -199,6 +205,7 @@ class KnowledgeAgent:
         *,
         user_id: uuid.UUID | None = None,
         org_id: uuid.UUID | None = None,
+        session_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         start = time.perf_counter()
         chunk_items = await self._retrieve(db, query, org_id)
@@ -221,6 +228,7 @@ class KnowledgeAgent:
             user_id=user_id,
             org_id=org_id,
             latency_ms=latency_ms,
+            session_id=session_id,
         )
         yield json.dumps(
             {

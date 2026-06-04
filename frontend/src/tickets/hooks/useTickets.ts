@@ -13,11 +13,7 @@ export function useTickets() {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!enabled) {
-      setTickets([]);
-      setIsLoading(false);
-      return;
-    }
+    if (!enabled) return;
     try {
       const data = await listTickets();
       setTickets(data);
@@ -30,11 +26,35 @@ export function useTickets() {
   }, [enabled]);
 
   useEffect(() => {
-    refresh();
     if (!enabled) return;
-    const interval = setInterval(refresh, POLL_MS);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const data = await listTickets();
+        if (!cancelled) {
+          setTickets(data);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load tickets");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    void run();
+    const interval = setInterval(() => void refresh(), POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [refresh, enabled]);
 
-  return { tickets, isLoading, error, refresh };
+  return {
+    tickets: enabled ? tickets : [],
+    isLoading: enabled ? isLoading : false,
+    error: enabled ? error : null,
+    refresh,
+  };
 }

@@ -2,20 +2,34 @@
   "name": "ai-executive-os-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "npm scripts wrap Python dev commands (like frontend package.json). Requires .venv — run npm run setup once.",
+  "description": "dev → .env.dev + Docker. prod → .env.production + remote Supabase.",
   "scripts": {
     "setup": "python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && npm install",
+
     "deps:docker": "docker compose -f ../docker/docker-compose.yml up -d postgres",
     "deps:docker:all": "docker compose -f ../docker/docker-compose.yml up -d postgres redis",
-    "db:migrate": ".venv/bin/alembic upgrade head",
-    "db:check": ".venv/bin/python scripts/check_services.py",
-    "check:env": ".venv/bin/python scripts/validate_env.py",
-    "check:prod": ".venv/bin/python scripts/validate_env.py --production",
-    "api": ".venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
-    "worker": ".venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info",
+
+    "db:check": "ENV_FILE=.env.dev .venv/bin/python scripts/check_services.py",
+    "db:migrate": "ENV_FILE=.env.dev .venv/bin/alembic upgrade head",
+    "db:check:prod": "ENV_FILE=.env.production .venv/bin/python scripts/check_services.py",
+    "db:migrate:prod": "ENV_FILE=.env.production .venv/bin/alembic upgrade head",
+
+    "check:env": "ENV_FILE=.env.dev .venv/bin/python scripts/validate_env.py",
+    "check:prod": "ENV_FILE=.env.production .venv/bin/python scripts/validate_env.py --production",
+    "verify:supabase": "ENV_FILE=.env.production .venv/bin/python scripts/verify_supabase_env.py",
+
+    "api": "ENV_FILE=.env.dev .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "worker": "ENV_FILE=.env.dev .venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info",
+    "api:prod": "ENV_FILE=.env.production .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "worker:prod": "ENV_FILE=.env.production .venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info",
+
     "predev": "npm run db:check && npm run db:migrate",
-    "dev": "npm run predev && concurrently -k -n api,worker -c blue,magenta \"npm run api\" \"npm run worker\"",
-    "dev:api": "npm run predev && npm run api",
+    "preprod": "npm run verify:supabase && npm run check:prod && npm run db:check:prod && npm run db:migrate:prod",
+
+    "dev": "npm run deps:docker:all && npm run check:env && npm run predev && concurrently -k -n api,worker -c blue,magenta \"npm run api\" \"npm run worker\"",
+    "prod": "npm run preprod && concurrently -k -n api,worker -c blue,magenta \"npm run api:prod\" \"npm run worker:prod\"",
+    "dev:prod": "npm run prod",
+
     "bootstrap": "npm run deps:docker && npm run setup && npm run db:migrate"
   },
   "devDependencies": {

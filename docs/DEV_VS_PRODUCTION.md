@@ -165,6 +165,25 @@ cp .env.production.example .env.production
 
 For **local prod test**, you may keep the same `DATABASE_URL` as dev (Docker on `5433`) so you do not depend on Supabase network from your laptop. Use hosted `DATABASE_URL` only when testing remote DB on purpose.
 
+**Remote Supabase from laptop:** see **[SUPABASE_REMOTE_DATABASE.md](./SUPABASE_REMOTE_DATABASE.md)** (pooler URI + `npm run dev:prod`).
+
+**Recommended on laptop when remote DB fails (IPv6 / firewall):**
+
+```bash
+cd backend
+cp .env.production.local.example .env.production.local
+# Edit .env.production.local: paste SUPABASE_*, ENCRYPTION_KEY, GEMINI_* from .env.production
+npm run deps:docker:all
+npm run dev:prod:local
+```
+
+This runs `APP_ENV=production` (real JWT rules) against **local** Postgres on `5433` and Redis on `6380`.
+
+| File | When |
+|------|------|
+| `.env.production` | Real deploy / remote Supabase + Upstash |
+| `.env.production.local` | Laptop prod simulation (local DB) |
+
 ### Step 2 — Activate production backend env
 
 **Option A — temporary copy (simple)**
@@ -302,14 +321,37 @@ Use `backend/.env.production` as a **reference** when setting server secrets —
 
 ### Production-ready (local simulation)?
 
-- [ ] `backend/.env.production` filled (or `.env` copied from it)
+- [ ] `backend/.env.production.local` created from `.env.production.local.example` + secrets from `.env.production`
 - [ ] `APP_ENV=production`
-- [ ] `cd backend && npm run check:prod` → Validation passed
-- [ ] `npm run db:check` → OK
-- [ ] `npm run dev` → starts without exit
+- [ ] `cd backend && ENV_FILE=.env.production.local npm run check:prod` → Validation passed
+- [ ] `npm run db:check:prod:local` → OK (Docker Postgres + Redis)
+- [ ] `npm run dev:prod:local` → starts without exit
 - [ ] Chat works **only when logged in** (no dev headers)
 - [ ] Optional: `cd frontend && npm run build && npm run start` → prod UI
 - [ ] Restored `.env.development.backup` → dev workflow again
+
+---
+
+## One-command start
+
+From **repo root** (starts backend + frontend):
+
+| Command | Env files | What runs |
+|---------|-----------|-----------|
+| `npm run dev` | `backend/.env.dev` + `frontend/.env.dev` | Docker Postgres/Redis → check → migrate → API + Celery + Next dev |
+| `npm run prod` | `backend/.env.production` + `frontend/.env.production` | Verify Supabase refs → check → migrate remote DB → API + Celery + Next dev |
+
+Per package only:
+
+```bash
+cd backend && npm run dev    # .env.dev
+cd backend && npm run prod   # .env.production
+
+cd frontend && npm run dev   # .env.dev
+cd frontend && npm run prod  # .env.production
+```
+
+First time: `npm run setup` from repo root.
 
 ---
 

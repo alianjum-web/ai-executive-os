@@ -9,7 +9,7 @@ def bypass_user_db_sync(monkeypatch):
     async def noop(db, auth):
         return None
 
-    monkeypatch.setattr("app.core.security._ensure_user_row", noop)
+    monkeypatch.setattr("app.core.security.ensure_user_row", noop)
 
 
 @pytest.fixture

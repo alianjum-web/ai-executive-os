@@ -1,24 +1,15 @@
 import uuid
-from dataclasses import dataclass
 
 import jwt
 from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_context import AuthContext
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.feature_flags import flags
 from app.core.supabase_jwt import decode_supabase_access_token
-from app.models.database import User
-
-
-@dataclass
-class AuthContext:
-    user_id: uuid.UUID
-    org_id: uuid.UUID
-    role: str
-    email: str | None = None
+from app.core.tenant_sync import ensure_user_row
 
 
 def _auth_from_headers(
@@ -44,7 +35,7 @@ async def get_current_user(
 ) -> AuthContext:
     dev_auth = _auth_from_headers(x_org_id, x_user_id, x_user_role)
     if dev_auth and settings.is_development:
-        await _ensure_user_row(db, dev_auth)
+        await ensure_user_row(db, dev_auth)
         return dev_auth
 
     if not authorization or not authorization.startswith("Bearer "):
@@ -86,28 +77,8 @@ async def get_current_user(
         role=role,
         email=email,
     )
-    await _ensure_user_row(db, auth)
+    await ensure_user_row(db, auth, metadata=user_metadata)
     return auth
-
-
-async def _ensure_user_row(db: AsyncSession, auth: AuthContext) -> None:
-    result = await db.execute(select(User).where(User.id == auth.user_id))
-    user = result.scalar_one_or_none()
-    if user:
-        user.org_id = auth.org_id
-        user.role = auth.role
-        if auth.email:
-            user.email = auth.email
-    else:
-        db.add(
-            User(
-                id=auth.user_id,
-                email=auth.email or f"{auth.user_id}@local.dev",
-                role=auth.role,
-                org_id=auth.org_id,
-            )
-        )
-    await db.commit()
 
 
 def require_admin(auth: AuthContext = Depends(get_current_user)) -> AuthContext:

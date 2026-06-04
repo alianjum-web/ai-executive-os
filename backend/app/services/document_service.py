@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -38,12 +39,22 @@ class DocumentService:
         content = await file.read()
         storage_path.write_bytes(content)
 
+        mime_map = {
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".md": "text/markdown",
+            ".markdown": "text/markdown",
+            ".txt": "text/plain",
+        }
+
         document = Document(
             id=doc_id,
             user_id=user_id,
             org_id=org_id,
             filename=file.filename or "unknown",
             storage_path=str(storage_path),
+            mime_type=mime_map.get(suffix),
+            file_size_bytes=len(content),
             status="pending",
         )
         db.add(document)
@@ -94,6 +105,10 @@ class DocumentService:
 
             await self.vector.store_chunks(db, db_chunks)
             document.status = "ready"
+            document.indexed_at = datetime.now(timezone.utc)
+            document.page_count = max(
+                (c.page_number or 0 for c in all_chunks), default=0
+            ) or None
         except Exception:
             document.status = "error"
             raise
@@ -103,7 +118,11 @@ class DocumentService:
     async def list_documents(
         self, db: AsyncSession, org_id: uuid.UUID | None = None
     ) -> list[Document]:
-        stmt = select(Document).order_by(Document.created_at.desc())
+        stmt = (
+            select(Document)
+            .where(Document.deleted_at.is_(None))
+            .order_by(Document.created_at.desc())
+        )
         if org_id is not None:
             stmt = stmt.where(Document.org_id == org_id)
         result = await db.execute(stmt)

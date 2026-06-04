@@ -1,9 +1,16 @@
+import os
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Dev: .env.dev  |  Prod: .env.production  (set via npm scripts ENV_FILE=…)
+_ENV_FILE = os.getenv("ENV_FILE", ".env.dev")
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE, extra="ignore", populate_by_name=True
+    )
 
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/sop_automator",
@@ -93,18 +100,35 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
-    def supabase_jwks_url(self) -> str:
+    def supabase_project_url(self) -> str:
+        """Project root URL (not Data API /rest/v1). Used for Auth JWKS + issuer."""
         base = self.supabase_url.rstrip("/")
+        if base.endswith("/rest/v1"):
+            base = base[: -len("/rest/v1")]
+        return base
+
+    @property
+    def supabase_jwks_url(self) -> str:
+        base = self.supabase_project_url
         if not base:
             return ""
         return f"{base}/auth/v1/.well-known/jwks.json"
 
     @property
     def supabase_jwt_issuer(self) -> str:
-        base = self.supabase_url.rstrip("/")
+        base = self.supabase_project_url
         if not base:
             return ""
         return f"{base}/auth/v1"
+
+    @property
+    def redis_url_for_celery(self) -> str:
+        """Celery requires ssl_cert_reqs on rediss:// (e.g. Upstash)."""
+        url = self.redis_url
+        if url.startswith("rediss://") and "ssl_cert_reqs" not in url:
+            sep = "&" if "?" in url else "?"
+            return f"{url}{sep}ssl_cert_reqs=CERT_NONE"
+        return url
 
     @property
     def is_development(self) -> bool:

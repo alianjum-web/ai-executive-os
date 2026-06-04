@@ -11,18 +11,20 @@ Monorepo for an AI-powered executive operating system: document ingest (RAG), st
 1. [How the project fits together](#how-the-project-fits-together)
 2. [Repository layout](#repository-layout)
 3. [Prerequisites](#prerequisites)
-4. [Environment files (local vs production)](#environment-files-local-vs-production)
-5. [First-time setup](#first-time-setup)
-6. [Every day — start the app](#every-day--start-the-app)
-7. [Health checks](#health-checks)
-8. [**Dev vs production — full guide**](#dev-vs-production--full-guide) ← check prod on laptop
-9. [Backend commands (`backend/package.json`)](#backend-commands-backendpackagejson)
-10. [Frontend commands (`frontend/package.json`)](#frontend-commands-frontendpackagejson)
-11. [Alternative: full stack in Docker](#alternative-full-stack-in-docker)
-12. [How chat and auth work](#how-chat-and-auth-work)
-13. [Troubleshooting](#troubleshooting)
-14. [Tests and deeper docs](#tests-and-deeper-docs)
-15. [API reference (summary)](#api-reference-summary)
+4. [**New developer — one-page start**](#new-developer--one-page-start)
+5. [Environment files: dev vs production](#environment-files-dev-vs-production)
+6. [What changes between dev and production env](#what-changes-between-dev-and-production-env)
+7. [First-time setup (once per machine)](#first-time-setup-once-per-machine)
+8. [Every day — start dev or production](#every-day--start-dev-or-production)
+9. [Command cheat sheet](#command-cheat-sheet)
+10. [Health checks](#health-checks)
+11. [Backend & frontend scripts](#backend--frontend-scripts)
+12. [Core code files](#core-code-files)
+13. [Alternative: full stack in Docker](#alternative-full-stack-in-docker)
+14. [How chat and auth work](#how-chat-and-auth-work)
+15. [Troubleshooting](#troubleshooting)
+16. [Tests and deeper docs](#tests-and-deeper-docs)
+17. [API reference (summary)](#api-reference-summary)
 
 ---
 
@@ -56,7 +58,68 @@ Monorepo for an AI-powered executive operating system: document ingest (RAG), st
 | **Supabase** | **Auth only** in typical local dev (JWT). Optional hosted DB in production |
 | **Redis** | Celery broker + RAG cache |
 
-**Local dev recommendation:** Postgres in Docker on host port **5433**, Redis on **6379** (often already installed on Linux). Supabase URL stays in `.env` for **JWT verification**, not necessarily for `DATABASE_URL`.
+**Local dev recommendation:** Postgres in Docker on host port **5433**, Redis on **6379** (or Docker **6380**). Supabase is used for **auth (JWT)** in both modes; only `DATABASE_URL` usually changes between dev (local) and production (hosted).
+
+---
+
+## New developer — one-page start
+
+### First time only (clone → env → install → database)
+
+Run from the **repo root** (`ai-executive-os/`):
+
+```bash
+git clone <repo-url> ai-executive-os
+cd ai-executive-os
+
+# 1) Install root tooling (runs backend + frontend together later)
+npm install
+
+# 2) Create env files (never commit these — they are gitignored)
+cp backend/.env.example backend/.env.dev
+cp frontend/.env.example frontend/.env.dev
+
+# 3) Edit both files — same Supabase project, keys from dashboard (see below)
+# 4) Python venv + npm deps + first migration
+npm run setup
+cd backend && npm run bootstrap
+cd ..
+```
+
+`bootstrap` starts Docker Postgres, creates `.venv`, installs Python packages, runs Alembic on **local** DB (`127.0.0.1:5433`).
+
+**Production env (optional, for testing prod on laptop):**
+
+```bash
+cp backend/.env.production.example backend/.env.production
+cp frontend/.env.production.example frontend/.env.production
+# Fill with Session pooler DATABASE_URL, Upstash REDIS_URL, API keys — see docs/SUPABASE_REMOTE_DATABASE.md
+```
+
+### Every day after that — one command starts everything
+
+| Mode | Command (repo root) | Env files used |
+|------|---------------------|----------------|
+| **Development** | `npm run dev` | `backend/.env.dev` + `frontend/.env.dev` |
+| **Production-like** | `npm run prod` | `backend/.env.production` + `frontend/.env.production` |
+
+Both commands start **backend (API + Celery)** and **frontend (Next.js)** in one terminal.
+
+**Or run separately** (two terminals):
+
+```bash
+# Terminal 1 — backend
+cd backend && npm run dev    # or: npm run prod
+
+# Terminal 2 — frontend
+cd frontend && npm run dev   # or: npm run prod
+```
+
+| URL | Service |
+|-----|---------|
+| http://localhost:3000 | Frontend |
+| http://127.0.0.1:8000/docs | API (Swagger) |
+| http://127.0.0.1:8000/api/v1/health | Health check |
 
 ---
 
@@ -93,17 +156,20 @@ Accounts / keys you will need:
 
 ---
 
-## Environment files (local vs production)
+## Environment files: dev vs production
 
-Copy **example** files (committed). Edit **active** files (gitignored).
+We use **two active env files per app**:
 
-| Mode | Backend | Frontend |
-|------|---------|----------|
-| **Local dev (recommended)** | `backend/.env` ← `backend/.env.example` | `frontend/.env.local` ← `frontend/.env.example` |
-| **Production (split deploy)** | `backend/.env` on server | Host env / `frontend/.env.production` |
-| **All Docker** | `docker/.env` ← `docker/.env.example` | Vars in same `docker/.env` |
+```text
+backend/.env.dev          → npm run dev
+backend/.env.production   → npm run prod
+frontend/.env.dev         → npm run dev
+frontend/.env.production  → npm run prod
+```
 
-### Local `backend/.env` (minimum)
+Copy from examples: `backend/.env.example`, `frontend/.env.example`, `backend/.env.production.example`, `frontend/.env.production.example`.
+
+### Minimum `backend/.env.dev`
 
 ```env
 APP_ENV=development
@@ -111,155 +177,72 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/sop_automator
 REDIS_URL=redis://127.0.0.1:6379/0
 CORS_ORIGINS=http://localhost:3000
 ENCRYPTION_KEY=<generate — see below>
-SUPABASE_URL=https://<your-project>.supabase.co
+SUPABASE_URL=https://<project-ref>.supabase.co
 GEMINI_API_KEY=<if ai_provider is gemini>
 ```
-
-Generate encryption key:
 
 ```bash
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-### Local `frontend/.env.local` (minimum)
+### Minimum `frontend/.env.dev`
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from Supabase dashboard>
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<from Supabase dashboard>
 ```
 
-Full variable list: [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md) · Quick copy-paste: [`docs/ENV_QUICK_START.md`](docs/ENV_QUICK_START.md)
-
-Production templates (commit-safe): `backend/.env.production.example`, `frontend/.env.production.example`
+Full list: [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md)
 
 ---
 
-## Dev vs production — full guide
+## What changes between dev and production env
 
-**Read this when you want to test `APP_ENV=production` on your laptop** or compare dev vs prod checks.
+| Variable | Development | Production |
+|----------|-------------|------------|
+| `APP_ENV` | `development` | `production` |
+| `DATABASE_URL` | Local Docker `:5433` | Supabase Session pooler URI |
+| `REDIS_URL` | `redis://127.0.0.1:6379/0` | Upstash `rediss://…` |
+| `CORS_ORIGINS` | `http://localhost:3000` | Prod domain (or localhost for local prod test) |
+| `SUPABASE_URL` | `https://<ref>.supabase.co` (no `/rest/v1/`) | Same project root URL |
+| LLM keys (`GEMINI_API_KEY`, …) | Usually same or separate prod key | |
+| `NEXT_PUBLIC_*` | Local API + Supabase | Prod API URL or localhost when testing |
 
-→ **[`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md)** (complete step-by-step, checklists, switching `.env` files)
+**Behavior:** dev allows optional `X-Org-Id` headers; production requires Supabase JWT only.
 
-Quick commands:
+**Switching:** keep both files; run `npm run dev` or `npm run prod` — do not overwrite one file.
 
-```bash
-# Verify development
-cd backend && npm run check:env && npm run db:check
-cd frontend && npm run dev
-
-# Verify production rules (before/after copying .env.production → .env)
-cd backend && npm run check:prod && npm run db:check
-```
-
-| Check | Command | Pass means |
-|-------|---------|------------|
-| Dev config | `npm run check:env` | `APP_ENV=development`, keys OK |
-| Prod config | `npm run check:prod` | Production rules satisfied |
-| DB + Redis | `npm run db:check` | Services reachable |
-| API up | `curl http://127.0.0.1:8000/api/v1/health` | HTTP 200 + healthy body |
+→ [`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md) · [`docs/SUPABASE_REMOTE_DATABASE.md`](docs/SUPABASE_REMOTE_DATABASE.md)
 
 ---
 
-## First-time setup
+## First-time setup (once per machine)
 
-Run these **once per machine** (or after cloning the repo).
-
-### 1. Clone and open the repo
-
-```bash
-cd ~/Documents/GitHub/ai-executive-os   # your clone path
-```
-
-### 2. Backend — first time only
-
-```bash
-cd backend
-cp .env.example .env
-```
-
-Edit `backend/.env`: add `ENCRYPTION_KEY`, `SUPABASE_URL`, `GEMINI_API_KEY` (or other LLM key), and keep local `DATABASE_URL` / `REDIS_URL` as in the example above.
-
-```bash
-npm run bootstrap
-```
-
-What `bootstrap` does (in order):
-
-1. `npm run deps:docker` — starts **Postgres** container (host port **5433**)
-2. `npm run setup` — Python `.venv` + `pip install` + `npm install` (for `concurrently`)
-3. `npm run db:migrate` — Alembic migrations on local DB
-
-### 3. Frontend — first time only
-
-```bash
-cd ../frontend
-cp .env.example .env.local
-```
-
-Edit `frontend/.env.local` with your Supabase URL and anon key.
-
-```bash
-npm install
-```
-
-### 4. Verify (optional but recommended)
-
-```bash
-cd ../backend
-npm run db:check
-curl -s http://127.0.0.1:8000/api/v1/health   # after starting backend once — see below
-```
+See [New developer — one-page start](#new-developer--one-page-start).
 
 ---
 
-## Every day — start the app
+## Every day — start dev or production
 
-Use **two terminals**. You do **not** need `bootstrap` again unless you deleted `.venv`, changed major deps, or need a fresh DB container.
+| Mode | Repo root (one command) | Separate terminals |
+|------|-------------------------|-------------------|
+| **Dev** | `npm run dev` | `cd backend && npm run dev` + `cd frontend && npm run dev` |
+| **Prod** | `npm run prod` | `cd backend && npm run prod` + `cd frontend && npm run prod` |
 
-### Terminal 1 — Backend
-
-```bash
-cd ~/Documents/GitHub/ai-executive-os/backend
-
-# Only if Docker Postgres was stopped (e.g. after reboot):
-npm run deps:docker
-
-# Start API (hot reload) + Celery worker + migrate + preflight checks:
-npm run dev
-```
-
-| URL | Description |
-|-----|-------------|
-| http://127.0.0.1:8000/api/v1/health | Health check |
-| http://127.0.0.1:8000/docs | Swagger / OpenAPI |
-
-### Terminal 2 — Frontend
-
-```bash
-cd ~/Documents/GitHub/ai-executive-os/frontend
-npm run dev
-```
-
-| URL | Description |
-|-----|-------------|
-| http://localhost:3000 | Web app — sign in, chat, upload |
-
-**Chat:** sign in with Supabase → open chat → ask a question. For useful RAG answers, upload at least one document (ingest uses Celery from `npm run dev`).
+After reboot, if DB is down: `cd backend && npm run deps:docker:all` then `npm run dev`.
 
 ---
 
-## Cheat sheet
+## Command cheat sheet
 
-| When | Where | Command |
-|------|--------|---------|
-| **First time** | `backend/` | `cp .env.example .env` → edit → `npm run bootstrap` |
-| **First time** | `frontend/` | `cp .env.example .env.local` → edit → `npm install` |
-| **Every session** | `backend/` | `npm run deps:docker` (if DB container down) → `npm run dev` |
-| **Every session** | `frontend/` | `npm run dev` |
-| **Check DB/Redis** | `backend/` | `npm run db:check` |
-| **Migrations only** | `backend/` | `npm run db:migrate` |
-| **API only (no Celery)** | `backend/` | `npm run dev:api` |
+| When | Command |
+|------|---------|
+| **First time** | `npm install && npm run setup && cd backend && npm run bootstrap` |
+| **Copy dev env** | `cp backend/.env.example backend/.env.dev` and `cp frontend/.env.example frontend/.env.dev` |
+| **Every day — dev** | `npm run dev` |
+| **Every day — prod** | `npm run prod` |
+| **Verify prod env** | `cd backend && npm run verify:supabase && npm run check:prod` |
 
 ---
 
@@ -282,26 +265,19 @@ Frontend: open http://localhost:3000 — if login loads, Supabase env vars are w
 
 ---
 
-## Backend commands (`backend/package.json`)
+## Backend & frontend scripts
 
-All commands run from **`backend/`** directory.
+### Backend (`backend/package.json`) — uses `ENV_FILE=.env.dev` or `.env.production`
 
-| Script | First time only? | What it does |
-|--------|------------------|--------------|
-| `npm run bootstrap` | **Yes** | Docker Postgres + `setup` + `db:migrate` |
-| `npm run setup` | **Yes** (or if `.venv` missing) | `python3 -m venv .venv` + pip + npm deps |
-| `npm run deps:docker` | As needed | Start Postgres container (port **5433**) |
-| `npm run deps:docker:all` | As needed | Postgres + Redis container (Redis on **6380**) |
-| `npm run db:migrate` | Auto in `dev` | `alembic upgrade head` |
-| `npm run db:check` | Auto in `dev` | Test Postgres + Redis from `.env` |
-| `npm run check:env` | Anytime | Validate development env |
-| `npm run check:prod` | Before prod test | Validate production env |
-| `npm run dev` | **Daily** | `db:check` → `db:migrate` → API `--reload` + Celery |
-| `npm run dev:api` | Daily | Same preflight, API only (no Celery) |
-| `npm run api` | — | Uvicorn only |
-| `npm run worker` | — | Celery only |
+| Script | What it does |
+|--------|----------------|
+| `npm run bootstrap` | **First time:** Docker Postgres + `setup` + migrate (`.env.dev`) |
+| `npm run setup` | Python `.venv` + pip + npm deps |
+| `npm run dev` | Full dev stack: checks → migrate → API + Celery |
+| `npm run prod` | Full prod stack: verify Supabase → checks → migrate remote → API + Celery |
+| `npm run deps:docker:all` | Start Postgres (**5433**) + Redis (**6380**) |
 
-More detail: [`backend/README.md`](backend/README.md)
+More: [`backend/README.md`](backend/README.md)
 
 ### Manual backend (without npm scripts)
 
@@ -316,18 +292,24 @@ celery -A app.tasks.celery_app.celery_app worker --loglevel=info
 
 ---
 
-## Frontend commands (`frontend/package.json`)
+### Frontend (`frontend/package.json`) — loads `.env.dev` or `.env.production` via shell
 
-All commands run from **`frontend/`** directory.
+| Script | What it does |
+|--------|----------------|
+| `npm run dev` | Next.js dev server `:3000` with **`.env.dev`** |
+| `npm run prod` | Next.js dev server with **`.env.production`** (local prod test) |
+| `npm run build:prod` | Production build with `.env.production` |
 
-| Script | First time only? | What it does |
-|--------|------------------|--------------|
-| `npm install` | **Yes** | Install dependencies |
-| `npm run dev` | **Daily** | Next.js dev server on :3000 (hot reload) |
-| `npm run build` | Deploy | Production build |
-| `npm run start` | Deploy | Run production build |
-| `npm test` | — | Jest unit tests |
-| `npm run test:e2e` | — | Playwright E2E |
+---
+
+## Core code files
+
+Where to look when debugging — see [`docs/CORE_FILES.md`](docs/CORE_FILES.md).
+
+| Layer | Main files |
+|-------|------------|
+| **Backend** | `app/main.py`, `app/core/security.py`, `app/core/tenant_sync.py` |
+| **Frontend** | `src/proxy.ts`, `src/auth/organisms/AuthProvider.tsx`, `src/auth/services/auth.service.ts` |
 
 ---
 
@@ -351,11 +333,11 @@ docker compose up --build
 
 ## How chat and auth work
 
-1. User signs in on the frontend via **Supabase Auth** (`frontend/.env.local`).
+1. User signs in on the frontend via **Supabase Auth** (`frontend/.env.dev` or `.env.production`).
 2. Chat calls `POST /api/v1/query/stream` with `Authorization: Bearer <access_token>` (`frontend/src/hooks/useQueryStream.ts`).
 3. Backend verifies JWT using **`SUPABASE_URL`** (JWKS) — see `backend/app/core/supabase_jwt.py`.
 4. User must have `org_id` and `role` in Supabase `user_metadata` (set at sign-up).
-5. RAG reads chunks from **Postgres** for that `org_id`; LLM key comes from `backend/.env` per `ai_provider`.
+5. RAG reads chunks from **Postgres** for that `org_id`; LLM key comes from `backend/.env.dev` (or `.env.production`) per `ai_provider`.
 
 **Local dev shortcut:** with `APP_ENV=development`, the API also accepts headers `X-Org-Id`, `X-User-Id`, `X-User-Role` without a JWT (normal UI still uses Supabase login).
 
@@ -372,7 +354,9 @@ docker compose up --build
 | `address already in use` :6379 | Local Redis already running | Set `REDIS_URL=redis://127.0.0.1:6379/0`; skip Docker Redis |
 | `address already in use` :6379 with Docker | Port conflict | Use `npm run deps:docker:all` (Redis on **6380**) and `REDIS_URL=redis://127.0.0.1:6380/0` |
 | `cd backend: No such file or directory` | Already inside `backend/` | Run commands without extra `cd backend` |
-| Chat 401 | Not logged in or `SUPABASE_URL` mismatch | Align backend `SUPABASE_URL` with frontend project |
+| Chat 401 | Not logged in or `SUPABASE_URL` mismatch | Same project in backend + frontend; URL must be `https://<ref>.supabase.co` not `/rest/v1/` |
+| `duplicate key organizations_pkey` | Parallel API calls on login | Pull latest `tenant_sync.py`; restart `npm run prod` |
+| Celery `rediss:// ssl_cert_reqs` | Upstash without SSL param | Fixed in code — restart backend |
 | Chat 500 | Missing LLM API key | Add `GEMINI_API_KEY` (or key for your `ai_provider`) |
 | Empty chat answers | No documents | Upload a PDF/DOCX via UI (needs Celery in `npm run dev`) |
 
@@ -390,7 +374,9 @@ cd frontend && npm run test:e2e   # optional live stack: E2E_RUN_LIVE=1
 
 | Document | Content |
 |----------|---------|
-| [`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md) | **Dev vs prod checks, `.env.production`, local prod test** |
+| [`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md) | **Dev vs prod checks, switching env** |
+| [`docs/SUPABASE_REMOTE_DATABASE.md`](docs/SUPABASE_REMOTE_DATABASE.md) | Session pooler `DATABASE_URL` for production |
+| [`docs/CORE_FILES.md`](docs/CORE_FILES.md) | Main backend/frontend logic files |
 | [`docs/PROJECT_MASTER.md`](docs/PROJECT_MASTER.md) | Product vision, architecture, sprints |
 | [`docs/ENV_QUICK_START.md`](docs/ENV_QUICK_START.md) | Env templates + full-app start |
 | [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md) | All env vars |
@@ -434,7 +420,7 @@ data: {"type":"done","answer":"...","citations":[...],"latency_ms":120}
 
 1. Create a project at [supabase.com](https://supabase.com)  
 2. Enable Email auth  
-3. Set frontend `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
+3. Set frontend `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.dev`  
 4. Set backend `SUPABASE_URL` (same project) for JWT verification  
 5. Sign-up flow sets `org_id` / `role` in user metadata  
 
@@ -470,4 +456,4 @@ Live API: `GET /api/v1/config/features`
 ## Slack setup (optional)
 
 1. [api.slack.com/apps](https://api.slack.com/apps) → Event Subscriptions → `https://<api>/api/v1/webhook/slack`  
-2. `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN`, `DEFAULT_ORG_ID` in backend `.env`
+2. `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN`, `DEFAULT_ORG_ID` in `backend/.env.dev` or `.env.production`

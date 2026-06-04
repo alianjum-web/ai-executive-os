@@ -64,9 +64,26 @@ export function MetricsDashboard() {
 
   useEffect(() => {
     if (!enabled) return;
-    load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const data = await fetchAnalytics();
+        if (!cancelled) {
+          setMetrics(data);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load metrics");
+        }
+      }
+    };
+    void run();
+    const interval = setInterval(() => void run(), 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [enabled]);
 
   useEffect(() => {

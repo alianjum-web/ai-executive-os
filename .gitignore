@@ -6,6 +6,7 @@ build/
 __pycache__/
 *.pyc
 .env
+.env.dev
 .env.local
 .env.production
 .env*.local

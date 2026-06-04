@@ -17,6 +17,7 @@ export type LoginFormValues = {
 };
 
 export type SignupFormValues = LoginFormValues & {
+  fullName: string;
   orgName: string;
 };
 
@@ -63,7 +64,8 @@ export const signupResolver: Resolver<SignupFormValues> = async (values) => {
   const errors = validateSignupFields(
     values.email,
     values.password,
-    values.orgName
+    values.orgName,
+    values.fullName
   );
   if (hasFieldErrors(errors)) {
     return validationFailure<SignupFormValues>(errors);
@@ -72,6 +74,7 @@ export const signupResolver: Resolver<SignupFormValues> = async (values) => {
     values: {
       email: values.email.trim(),
       password: values.password,
+      fullName: values.fullName.trim(),
       orgName: values.orgName.trim(),
     },
     errors: {},

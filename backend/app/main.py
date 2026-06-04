@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routers import analytics, health, ingest, query, tickets, webhooks
+from app.api.v1.routers import analytics, health, ingest, profile, query, tickets, webhooks
 from app.core.config import settings
 
 API_DESCRIPTION = """
@@ -52,6 +52,7 @@ app.add_middleware(
 
 api_prefix = "/api/v1"
 app.include_router(health.router, prefix=api_prefix, tags=["health"])
+app.include_router(profile.router, prefix=api_prefix, tags=["profile"])
 app.include_router(ingest.router, prefix=api_prefix, tags=["documents"])
 app.include_router(query.router, prefix=api_prefix, tags=["knowledge"])
 app.include_router(analytics.router, prefix=api_prefix, tags=["analytics"])

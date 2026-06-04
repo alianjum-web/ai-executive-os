@@ -8,6 +8,9 @@ class DocumentResponse(BaseModel):
     id: uuid.UUID
     filename: str
     status: str
+    mime_type: str | None = None
+    file_size_bytes: int | None = None
+    page_count: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -30,6 +33,7 @@ class Citation(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1)
+    session_id: str | None = Field(default=None, max_length=64)
 
 
 class QueryResponse(BaseModel):
@@ -38,9 +42,23 @@ class QueryResponse(BaseModel):
     latency_ms: int | None = None
 
 
+class UserProfileResponse(BaseModel):
+    id: uuid.UUID
+    email: str
+    full_name: str | None = None
+    job_title: str | None = None
+    role: str
+    org_id: uuid.UUID | None = None
+    department: str | None = None
+    avatar_url: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class TicketResponse(BaseModel):
     id: uuid.UUID
     source: str
+    title: str | None = None
     intent: str | None
     priority: int | None
     summary: str | None
@@ -48,7 +66,9 @@ class TicketResponse(BaseModel):
     status: str
     assignee_email: str | None = None
     assignee_id: uuid.UUID | None = None
+    assignee_name: str | None = None
     slack_channel_id: str | None = None
+    due_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

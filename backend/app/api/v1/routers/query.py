@@ -29,6 +29,7 @@ async def query_knowledge(
         body.query,
         user_id=auth.user_id,
         org_id=org_id or auth.org_id,
+        session_id=body.session_id,
     )
 
 
@@ -50,6 +51,7 @@ async def query_knowledge_stream(
             body.query,
             user_id=auth.user_id,
             org_id=org_id or auth.org_id,
+            session_id=body.session_id,
         ):
             yield f"data: {line}\n\n"
 

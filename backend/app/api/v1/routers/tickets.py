@@ -27,14 +27,17 @@ async def list_tickets(
         TicketResponse(
             id=t.id,
             source=t.source,
+            title=t.title or t.summary,
             intent=t.intent,
             priority=t.priority,
             summary=t.summary,
             department=t.department,
             status=t.status,
             assignee_email=t.assignee.email if t.assignee else None,
+            assignee_name=t.assignee.full_name if t.assignee else None,
             assignee_id=t.assignee_id,
             slack_channel_id=t.slack_channel_id,
+            due_at=t.due_at,
             created_at=t.created_at,
         )
         for t in tickets

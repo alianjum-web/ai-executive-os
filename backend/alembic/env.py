@@ -4,6 +4,7 @@ from alembic import context
 from sqlalchemy import create_engine
 
 from app.core.config import settings
+from app.core.db_connect import sync_connect_args
 from app.models.database import Base
 
 config = context.config
@@ -28,7 +29,9 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = create_engine(sync_url)
+    connectable = create_engine(
+        sync_url, connect_args=sync_connect_args(sync_url)
+    )
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
