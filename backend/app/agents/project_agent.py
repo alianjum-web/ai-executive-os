@@ -1,9 +1,16 @@
+import copy
 import uuid
-from typing import TypedDict
+from typing import Any, TypedDict, cast
 
 from langgraph.graph import END, StateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.slack_events import (
+    extract_message_text,
+    slack_message_ts_for_line,
+    split_message_into_ticket_lines,
+)
+from app.models.http.slack import SlackEventCallbackPayload, SlackMessageEvent
 from app.services.assignee_service import AssigneeService
 from app.services.intent_service import IntentService
 from app.services.notification_service import NotificationService
@@ -12,7 +19,7 @@ from app.services.ticket_service import TicketService
 
 class ProjectState(TypedDict, total=False):
     org_id: str
-    raw_payload: dict
+    raw_payload: SlackEventCallbackPayload
     message_text: str
     slack_channel_id: str | None
     slack_message_ts: str | None
@@ -48,13 +55,10 @@ class ProjectAgent:
         return workflow.compile()
 
     async def _parse_payload(self, state: ProjectState) -> dict:
-        payload = state.get("raw_payload", {})
-        event = payload.get("event", payload)
-        text = event.get("text", "") or ""
-        if event.get("subtype") == "bot_message":
-            text = ""
+        payload = state.get("raw_payload") or {}
+        event: SlackMessageEvent = payload.get("event") or payload  # type: ignore[assignment]
         return {
-            "message_text": text.strip(),
+            "message_text": extract_message_text(event),
             "slack_channel_id": event.get("channel"),
             "slack_message_ts": event.get("ts"),
         }
@@ -89,22 +93,35 @@ class ProjectAgent:
     async def _send_notification(self, state: ProjectState) -> dict:
         return {}
 
-    async def run(
+    async def _create_ticket_for_line(
         self,
         db: AsyncSession,
         org_id: uuid.UUID,
-        raw_payload: dict,
+        *,
+        raw_payload: SlackEventCallbackPayload,
+        line_text: str,
+        channel_id: str | None,
+        message_ts: str | None,
     ) -> uuid.UUID | None:
-        event = raw_payload.get("event", raw_payload)
-        if event.get("bot_id") or event.get("subtype") == "bot_message":
-            return None
+        existing = await self.ticket_service.find_by_slack_message(
+            db,
+            org_id,
+            slack_channel_id=channel_id,
+            slack_message_ts=message_ts,
+        )
+        if existing:
+            return existing.id
 
-        text = (event.get("text") or "").strip()
-        if not text:
-            return None
+        line_payload: SlackEventCallbackPayload = copy.deepcopy(raw_payload)
+        line_event: SlackMessageEvent = dict(line_payload.get("event") or {})  # type: ignore[arg-type]
+        line_event["text"] = line_text
+        line_payload["event"] = line_event
 
-        parsed: ProjectState = await self.graph.ainvoke(
-            {"org_id": str(org_id), "raw_payload": raw_payload}
+        parsed = cast(
+            ProjectState,
+            await self.graph.ainvoke(
+                {"org_id": str(org_id), "raw_payload": line_payload}
+            ),
         )
 
         await self.assignee_service.ensure_default_mappings(db, org_id)
@@ -116,17 +133,54 @@ class ProjectAgent:
             db,
             org_id=org_id,
             source="slack",
-            raw_payload=raw_payload,
+            raw_payload=dict(line_payload),
             intent=parsed.get("intent", "general"),
             priority=parsed.get("priority", 3),
-            summary=parsed.get("summary", text[:200]),
+            summary=parsed.get("summary", line_text[:200]),
             department=parsed.get("department", "support"),
             assignee_id=assignee.id if assignee else None,
-            slack_channel_id=parsed.get("slack_channel_id"),
-            slack_message_ts=parsed.get("slack_message_ts"),
+            slack_channel_id=channel_id,
+            slack_message_ts=message_ts,
         )
 
         if assignee:
             await self.notifications.notify_slack_dm(assignee, ticket)
 
         return ticket.id
+
+    async def run(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        raw_payload: SlackEventCallbackPayload,
+    ) -> uuid.UUID | None:
+        event: SlackMessageEvent = raw_payload.get("event") or raw_payload  # type: ignore[assignment]
+        if event.get("bot_id") or event.get("subtype") == "bot_message":
+            return None
+
+        text = extract_message_text(event)
+        if not text:
+            return None
+
+        channel_id = event.get("channel")
+        base_ts = event.get("ts")
+        lines = split_message_into_ticket_lines(text)
+        multi_line = len(lines) > 1
+
+        first_id: uuid.UUID | None = None
+        for index, line_text in enumerate(lines):
+            line_ts = slack_message_ts_for_line(
+                base_ts or "", index, multi_line=multi_line
+            )
+            ticket_id = await self._create_ticket_for_line(
+                db,
+                org_id,
+                raw_payload=raw_payload,
+                line_text=line_text,
+                channel_id=channel_id,
+                message_ts=line_ts,
+            )
+            if ticket_id and first_id is None:
+                first_id = ticket_id
+
+        return first_id

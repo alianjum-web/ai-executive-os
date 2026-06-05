@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState } from "react";
 import { FileText } from "lucide-react";
 import { Badge } from "@/common/atoms/Badge";
 import { FileUploadCard } from "@/knowledge/molecules/FileUploadCard";
 import { Button } from "@/common/atoms/ui/button";
 import { Card } from "@/common/atoms/ui/card";
-import { deleteDocument } from "@/common/services/api/client";
+import { deleteDocument } from "@/common/api/client";
 import { useDocumentUpload } from "@/knowledge/hooks/useDocumentUpload";
 import { useRole } from "@/common/hooks/useRole";
 import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
@@ -17,19 +17,25 @@ import { LoadingBlock } from "@/common/molecules/LoadingBlock";
 export function DocumentLibrary() {
   const uploadEnabled = useFeatureFlag("DOCUMENT_UPLOAD_ENABLED");
   const { isAdmin } = useRole();
-  const { documents, isUploading, error, upload, refresh, isLoading } =
+  const { documents, isUploading, error, apiUnreachable, upload, refresh, isLoading } =
     useDocumentUpload();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
-    await deleteDocument(id);
-    await refresh();
+    if (deletingId) return;
+    setDeletingId(id);
+    try {
+      await deleteDocument(id);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Delete failed";
+      if (!message.toLowerCase().includes("not found")) {
+        console.warn("deleteDocument:", message);
+      }
+    } finally {
+      setDeletingId(null);
+      await refresh({ background: true });
+    }
   };
-
-  useEffect(() => {
-    refresh().catch(() => undefined);
-    const interval = setInterval(() => refresh().catch(() => undefined), 5000);
-    return () => clearInterval(interval);
-  }, [refresh]);
 
   if (!uploadEnabled) return null;
 
@@ -88,9 +94,10 @@ export function DocumentLibrary() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(doc.id)}
+                          disabled={deletingId === doc.id}
+                          onClick={() => void handleDelete(doc.id)}
                         >
-                          Delete
+                          {deletingId === doc.id ? "Deleting…" : "Delete"}
                         </Button>
                       </td>
                     ) : null}

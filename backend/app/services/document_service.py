@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.database import ActivityLog, Document, DocumentChunk, User
+from app.models.db.tables import ActivityLog, Document, DocumentChunk, User
 from app.services.chunking_service import ChunkingService
 from app.services.document_parser import DocumentParser
 from app.services.embedding_service import EmbeddingService
@@ -114,6 +114,21 @@ class DocumentService:
             raise
         finally:
             await db.commit()
+
+    async def get_document(
+        self,
+        db: AsyncSession,
+        document_id: uuid.UUID,
+        org_id: uuid.UUID | None = None,
+    ) -> Document | None:
+        stmt = select(Document).where(
+            Document.id == document_id,
+            Document.deleted_at.is_(None),
+        )
+        if org_id is not None:
+            stmt = stmt.where(Document.org_id == org_id)
+        result = await db.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def list_documents(
         self, db: AsyncSession, org_id: uuid.UUID | None = None

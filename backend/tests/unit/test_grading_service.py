@@ -28,6 +28,27 @@ async def test_filter_drops_low_relevance_chunks():
         assert item["grade"] > 2
 
 
+def test_heuristic_meta_document_query_keeps_chunks():
+    service = GradingService()
+    score = service._heuristic_grade(
+        "give me any information about the uploaded document please",
+        "AI Executive OS project blueprint and rollout milestones.",
+    )
+    assert score >= 3
+
+
+@pytest.mark.asyncio
+async def test_filter_respects_min_grade():
+    service = GradingService()
+    chunks = [{"content": "Annual PTO policy grants twenty days per year."}]
+    filtered = await service.filter_chunks(
+        "tell me about the uploaded document",
+        chunks,
+        min_grade=3,
+    )
+    assert len(filtered) == 1
+
+
 @pytest.mark.asyncio
 async def test_irrelevant_query_grades_low():
     service = GradingService()

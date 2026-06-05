@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.schemas import Citation, QueryResponse
+from app.models.http.schemas import Citation, QueryResponse
 
 HEADERS = {
     "X-Org-Id": str(uuid.uuid4()),

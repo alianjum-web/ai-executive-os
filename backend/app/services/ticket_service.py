@@ -1,10 +1,12 @@
 import uuid
+from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.database import Ticket
+from app.models.db.tables import Ticket
 
 
 class TicketService:
@@ -33,13 +35,34 @@ class TicketService:
         )
         return result.scalar_one_or_none()
 
+    async def find_by_slack_message(
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID,
+        *,
+        slack_channel_id: str | None,
+        slack_message_ts: str | None,
+    ) -> Ticket | None:
+        if not slack_channel_id or not slack_message_ts:
+            return None
+        result = await db.execute(
+            select(Ticket)
+            .where(
+                Ticket.org_id == org_id,
+                Ticket.slack_channel_id == slack_channel_id,
+                Ticket.slack_message_ts == slack_message_ts,
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def create_ticket_record(
         self,
         db: AsyncSession,
         *,
         org_id: uuid.UUID,
         source: str,
-        raw_payload: dict,
+        raw_payload: dict[str, Any],
         intent: str,
         priority: int,
         summary: str,
@@ -48,6 +71,16 @@ class TicketService:
         slack_channel_id: str | None = None,
         slack_message_ts: str | None = None,
     ) -> Ticket:
+        if slack_channel_id and slack_message_ts:
+            existing = await self.find_by_slack_message(
+                db,
+                org_id,
+                slack_channel_id=slack_channel_id,
+                slack_message_ts=slack_message_ts,
+            )
+            if existing:
+                return existing
+
         ticket = Ticket(
             org_id=org_id,
             source=source,
@@ -63,6 +96,19 @@ class TicketService:
             slack_message_ts=slack_message_ts,
         )
         db.add(ticket)
-        await db.commit()
-        await db.refresh(ticket)
-        return ticket
+        try:
+            await db.commit()
+            await db.refresh(ticket)
+            return ticket
+        except IntegrityError:
+            await db.rollback()
+            if slack_channel_id and slack_message_ts:
+                existing = await self.find_by_slack_message(
+                    db,
+                    org_id,
+                    slack_channel_id=slack_channel_id,
+                    slack_message_ts=slack_message_ts,
+                )
+                if existing:
+                    return existing
+            raise

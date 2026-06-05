@@ -1,13 +1,27 @@
 import { createClient } from "@/common/services/supabase/client";
 
+const SESSION_TIMEOUT_MS = 8_000;
+
+async function getSessionWithTimeout() {
+  const supabase = createClient();
+  return Promise.race([
+    supabase.auth.getSession(),
+    new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error("Supabase session timed out — check network or sign in again")),
+        SESSION_TIMEOUT_MS
+      );
+    }),
+  ]);
+}
+
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
   try {
-    const supabase = createClient();
-    const { data } = await supabase.auth.getSession();
+    const { data } = await getSessionWithTimeout();
     const session = data.session;
     if (session?.access_token) {
       headers.Authorization = `Bearer ${session.access_token}`;

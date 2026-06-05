@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Document, DocumentChunk
+from app.models.db.tables import Document, DocumentChunk
 
 
 class VectorService:

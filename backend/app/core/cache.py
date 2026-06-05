@@ -3,9 +3,8 @@ import json
 import logging
 from typing import Any
 
-import redis.asyncio as aioredis
-
 from app.core.config import settings
+from app.core.redis_client import create_async_redis
 
 logger = logging.getLogger(__name__)
 
@@ -14,17 +13,13 @@ _CACHE_TTL_SECONDS = 3600
 
 class QueryCacheService:
     def __init__(self) -> None:
-        self._redis: aioredis.Redis | None = None
+        self._redis = None
 
-    async def _client(self) -> aioredis.Redis | None:
+    async def _client(self):
         if not settings.redis_url:
             return None
         if self._redis is None:
-            self._redis = aioredis.from_url(
-                settings.redis_url,
-                encoding="utf-8",
-                decode_responses=True,
-            )
+            self._redis = create_async_redis(settings.redis_url)
         return self._redis
 
     @staticmethod

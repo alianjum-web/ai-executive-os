@@ -3,11 +3,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.models.http.enums import DocumentStatus, TicketSource, TicketStatus, UserRole
+from app.models.internal.domain import TopQuestionRow
+
 
 class DocumentResponse(BaseModel):
     id: uuid.UUID
     filename: str
-    status: str
+    status: DocumentStatus
     mime_type: str | None = None
     file_size_bytes: int | None = None
     page_count: int | None = None
@@ -19,16 +22,19 @@ class DocumentResponse(BaseModel):
 
 class IngestResponse(BaseModel):
     document_id: uuid.UUID
-    status: str = "pending"
+    status: DocumentStatus = "pending"
     message: str = "Document queued for processing"
 
 
 class Citation(BaseModel):
     chunk_id: uuid.UUID | None = None
+    document_id: uuid.UUID | None = None
     document_name: str
     page_number: int | None = None
     chunk_text: str
     excerpt: str | None = None
+    exact_quote_highlight: str | None = None
+    citation_index: int | None = None
 
 
 class QueryRequest(BaseModel):
@@ -47,7 +53,7 @@ class UserProfileResponse(BaseModel):
     email: str
     full_name: str | None = None
     job_title: str | None = None
-    role: str
+    role: UserRole
     org_id: uuid.UUID | None = None
     department: str | None = None
     avatar_url: str | None = None
@@ -57,13 +63,13 @@ class UserProfileResponse(BaseModel):
 
 class TicketResponse(BaseModel):
     id: uuid.UUID
-    source: str
+    source: TicketSource
     title: str | None = None
     intent: str | None
     priority: int | None
     summary: str | None
     department: str | None
-    status: str
+    status: TicketStatus
     assignee_email: str | None = None
     assignee_id: uuid.UUID | None = None
     assignee_name: str | None = None
@@ -79,4 +85,4 @@ class AnalyticsDashboard(BaseModel):
     latency_p50_ms: int | None
     latency_p95_ms: int | None
     documents_indexed: int
-    top_questions: list[dict]
+    top_questions: list[TopQuestionRow]

@@ -19,15 +19,20 @@
     "verify:supabase": "ENV_FILE=.env.production .venv/bin/python scripts/verify_supabase_env.py",
 
     "api": "ENV_FILE=.env.dev .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
-    "worker": "ENV_FILE=.env.dev .venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info",
+    "worker": "ENV_FILE=.env.dev .venv/bin/watchfiles --filter python '.venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info' app/tasks",
     "api:prod": "ENV_FILE=.env.production .venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
-    "worker:prod": "ENV_FILE=.env.production .venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info",
+    "worker:prod": "ENV_FILE=.env.production .venv/bin/watchfiles --filter python '.venv/bin/celery -A app.tasks.celery_app.celery_app worker --loglevel=info' app/tasks",
+    "check:celery": ".venv/bin/python scripts/check_celery_tasks.py",
+    "doc:reprocess": "ENV_FILE=.env.dev .venv/bin/python scripts/reprocess_document.py",
+    "doc:reprocess:prod": "ENV_FILE=.env.production .venv/bin/python scripts/reprocess_document.py",
+    "test:unit": ".venv/bin/python -m pytest tests/unit/ -q",
+    "typecheck": ".venv/bin/python -m pyright app",
 
-    "predev": "npm run db:check && npm run db:migrate",
-    "preprod": "npm run verify:supabase && npm run check:prod && npm run db:check:prod && npm run db:migrate:prod",
+    "predev": "npm run check:celery && npm run db:check && npm run db:migrate",
+    "preprod": "npm run verify:supabase && npm run check:prod && npm run check:celery && npm run db:check:prod && npm run db:migrate:prod",
 
-    "dev": "npm run deps:docker:all && npm run check:env && npm run predev && concurrently -k -n api,worker -c blue,magenta \"npm run api\" \"npm run worker\"",
-    "prod": "npm run preprod && concurrently -k -n api,worker -c blue,magenta \"npm run api:prod\" \"npm run worker:prod\"",
+    "dev": "npm run deps:docker:all && npm run check:env && concurrently -k -n api,worker -c blue,magenta \"npm run api\" \"npm run worker\"",
+    "prod": "concurrently -k -n api,worker -c blue,magenta \"npm run api:prod\" \"npm run worker:prod\"",
     "dev:prod": "npm run prod",
 
     "bootstrap": "npm run deps:docker && npm run setup && npm run db:migrate"

@@ -1,6 +1,7 @@
-import json
 import re
+from collections.abc import Sequence
 
+from app.models.internal.domain import GradedRagChunkItem, RagChunkItem
 from app.services.llm_service import LLMService
 
 
@@ -14,7 +15,7 @@ class GradingService:
         if not chunk_text.strip():
             return 1
 
-        if self.llm.has_client:
+        if self.llm.has_openai_client:
             prompt = (
                 f"Rate how relevant this document chunk is to the user question.\n"
                 f"Question: {query}\n\nChunk:\n{chunk_text[:1500]}\n\n"
@@ -31,6 +32,22 @@ class GradingService:
         return self._heuristic_grade(query, chunk_text)
 
     def _heuristic_grade(self, query: str, chunk_text: str) -> int:
+        q_lower = query.lower()
+        meta_signals = (
+            "document",
+            "upload",
+            "uploaded",
+            "file",
+            "pdf",
+            "sop",
+            "policy",
+            "knowledge",
+            "summary",
+            "information",
+        )
+        if chunk_text.strip() and any(signal in q_lower for signal in meta_signals):
+            return 3
+
         q_words = {w.lower() for w in re.findall(r"\w+", query) if len(w) > 3}
         c_words = {w.lower() for w in re.findall(r"\w+", chunk_text)}
         if not q_words:
@@ -47,12 +64,15 @@ class GradingService:
         return 1
 
     async def filter_chunks(
-        self, query: str, chunks: list[dict], min_grade: int = 3
-    ) -> list[dict]:
-        graded: list[dict] = []
+        self,
+        query: str,
+        chunks: Sequence[RagChunkItem],
+        min_grade: int = 3,
+    ) -> list[GradedRagChunkItem]:
+        graded: list[GradedRagChunkItem] = []
         for item in chunks:
             score = await self.grade_chunk(query, item["content"])
-            item["grade"] = score
-            if score > 2:
-                graded.append(item)
+            row: GradedRagChunkItem = {**item, "grade": score}
+            if score >= min_grade:
+                graded.append(row)
         return graded

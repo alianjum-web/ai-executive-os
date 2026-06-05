@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 
 from app.core.config import settings
 from app.core.db_connect import sync_connect_args
-from app.models.database import Base
+from app.models.db.tables import Base
 
 config = context.config
 sync_url = settings.database_url.replace("+asyncpg", "")

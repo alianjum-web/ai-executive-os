@@ -17,14 +17,27 @@ Related: [ENV_QUICK_START.md](./ENV_QUICK_START.md) · [ENVIRONMENT_VARIABLES.md
 
 ---
 
+## Don't confuse: `ENV_FILE` vs `APP_ENV` (backend)
+
+| | **Which file loads** | **`APP_ENV` in that file** |
+|--|----------------------|----------------------------|
+| **Controlled by** | `npm run dev` → `.env.dev`; `npm run prod` → `.env.production` (`ENV_FILE` in npm scripts) | Variable inside the loaded file |
+| **Does** | Picks `DATABASE_URL`, Redis, keys, etc. | Picks auth strictness and validation (not the file path) |
+
+**`APP_ENV=production` inside `.env.dev` does not load `.env.production`.** Use `npm run prod` with `backend/.env.production` filled in.
+
+Full explanation: [../README.md#dont-confuse-which-env-file-loads-vs-app_env-backend](../README.md#dont-confuse-which-env-file-loads-vs-app_env-backend) · [../backend/README.md](../backend/README.md#dont-confuse-env_file-vs-app_env)
+
+---
+
 ## Dev vs production at a glance
 
 | | **Development** | **Production** |
 |---|-----------------|----------------|
 | **Purpose** | Daily coding, hot reload | Same behavior as deployed server |
-| **Backend active file** | `backend/.env` | Server: `backend/.env` or secrets manager |
-| **Backend template** | `backend/.env.example` | `backend/.env.production.example` |
-| **Frontend active file** | `frontend/.env.local` | Host env or `frontend/.env.production` |
+| **Backend active file** | `backend/.env.dev` (`npm run dev`) | `backend/.env.production` (`npm run prod`) |
+| **Backend template** | `backend/.env.example` | copy to `.env.production` from example |
+| **Frontend active file** | `frontend/.env.dev` | `frontend/.env.production` |
 | **Frontend template** | `frontend/.env.example` | `frontend/.env.production.example` |
 | **`APP_ENV`** | `development` | `production` or `prod` |
 | **API auth** | Supabase JWT **or** dev headers `X-Org-Id`, `X-User-Id`, `X-User-Role` | **Supabase JWT only** |

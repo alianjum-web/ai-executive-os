@@ -1,15 +1,21 @@
-import type { Citation } from "@/common/services/api/client";
-import { CitationCard } from "@/chat/molecules/CitationCard";
+"use client";
+
+import type { Citation } from "@/common/api/client";
+import { AnswerWithCitations } from "@/chat/molecules/AnswerWithCitations";
 import { cn } from "@/common/lib/utils";
 
 export function ChatBubble({
   role,
   content,
   citations,
+  selectedCitationKey,
+  onSelectCitation,
 }: {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  selectedCitationKey?: string | null;
+  onSelectCitation?: (citation: Citation) => void;
 }) {
   const isUser = role === "user";
   return (
@@ -22,21 +28,21 @@ export function ChatBubble({
             : "border border-border bg-card text-card-foreground"
         )}
       >
-        <p className="whitespace-pre-wrap">{content || "…"}</p>
-        {citations && citations.length > 0 ? (
-          <div className="mt-3 space-y-2">
-            <p
-              className={cn(
-                "text-xs font-semibold uppercase tracking-wide",
-                isUser ? "text-white/75" : "text-muted-foreground"
-              )}
-            >
-              Sources
-            </p>
-            {citations.map((c, i) => (
-              <CitationCard key={c.chunk_id ?? i} citation={c} />
-            ))}
-          </div>
+        {isUser ? (
+          <p className="whitespace-pre-wrap">{content || "…"}</p>
+        ) : (
+          <AnswerWithCitations
+            content={content}
+            citations={citations}
+            selectedKey={selectedCitationKey}
+            onSelectCitation={onSelectCitation}
+          />
+        )}
+        {!isUser && citations && citations.length > 0 ? (
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            {citations.length} source{citations.length === 1 ? "" : "s"} in the
+            panel →
+          </p>
         ) : null}
       </div>
     </div>

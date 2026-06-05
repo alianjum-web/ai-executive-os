@@ -13,6 +13,7 @@ Monorepo for an AI-powered executive operating system: document ingest (RAG), st
 3. [Prerequisites](#prerequisites)
 4. [**New developer — one-page start**](#new-developer--one-page-start)
 5. [Environment files: dev vs production](#environment-files-dev-vs-production)
+   - [**Don't confuse: `ENV_FILE` vs `APP_ENV`**](#dont-confuse-which-env-file-loads-vs-app_env-backend)
 6. [What changes between dev and production env](#what-changes-between-dev-and-production-env)
 7. [First-time setup (once per machine)](#first-time-setup-once-per-machine)
 8. [Every day — start dev or production](#every-day--start-dev-or-production)
@@ -169,6 +170,28 @@ frontend/.env.production  → npm run prod
 
 Copy from examples: `backend/.env.example`, `frontend/.env.example`, `backend/.env.production.example`, `frontend/.env.production.example`.
 
+### Don't confuse: which env file loads vs `APP_ENV` (backend)
+
+New contributors often mix these up. They are **not** the same thing.
+
+| Concept | What controls it | What it does |
+|---------|------------------|--------------|
+| **Which file is read** | How you **start** the app (`npm run dev` vs `npm run prod`) | Backend: shell variable `ENV_FILE` (see `backend/app/core/config.py`). Frontend: `package.json` runs `source .env.dev` or `source .env.production`. |
+| **`APP_ENV` inside that file** | A line **inside** the loaded file (`development` or `production`) | Changes **runtime rules** only — not which file opens. |
+
+**Rule:** `npm run dev` always loads **`.env.dev`**. `npm run prod` always loads **`.env.production`**.
+
+Setting `APP_ENV=production` inside **`.env.dev`** does **not** load `.env.production`. You still get `DATABASE_URL`, `REDIS_URL`, etc. from `.env.dev`, but the API behaves more like production (e.g. no `X-Org-Id` dev headers, stricter validation). Avoid that mix — use two files and the matching npm command.
+
+```text
+npm run dev   →  ENV_FILE=.env.dev          →  APP_ENV=development   (typical)
+npm run prod  →  ENV_FILE=.env.production   →  APP_ENV=production  (typical)
+```
+
+Implementation: [`backend/app/core/config.py`](backend/app/core/config.py) (`ENV_FILE` default `.env.dev`). Auth uses `APP_ENV` via `settings.is_development` in [`backend/app/core/security.py`](backend/app/core/security.py).
+
+More detail: [`backend/README.md`](backend/README.md#dont-confuse-env_file-vs-app_env) · [`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md)
+
 ### Minimum `backend/.env.dev`
 
 ```env
@@ -209,9 +232,9 @@ Full list: [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md)
 | LLM keys (`GEMINI_API_KEY`, …) | Usually same or separate prod key | |
 | `NEXT_PUBLIC_*` | Local API + Supabase | Prod API URL or localhost when testing |
 
-**Behavior:** dev allows optional `X-Org-Id` headers; production requires Supabase JWT only.
+**Behavior:** when `APP_ENV=development` (in the file that was loaded), the API allows optional `X-Org-Id` dev headers; when `APP_ENV=production`, Supabase JWT is required.
 
-**Switching:** keep both files; run `npm run dev` or `npm run prod` — do not overwrite one file.
+**Switching:** keep both files; run `npm run dev` or `npm run prod` — do not overwrite one file and do not rely on changing only `APP_ENV` to pick `.env.production`.
 
 → [`docs/DEV_VS_PRODUCTION.md`](docs/DEV_VS_PRODUCTION.md) · [`docs/SUPABASE_REMOTE_DATABASE.md`](docs/SUPABASE_REMOTE_DATABASE.md)
 
@@ -455,5 +478,24 @@ Live API: `GET /api/v1/config/features`
 
 ## Slack setup (optional)
 
-1. [api.slack.com/apps](https://api.slack.com/apps) → Event Subscriptions → `https://<api>/api/v1/webhook/slack`  
-2. `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN`, `DEFAULT_ORG_ID` in `backend/.env.dev` or `.env.production`
+### Local development (ngrok)
+
+Slack cannot reach `localhost`. Use a tunnel and point Event Subscriptions at it:
+
+1. Run API: `cd backend && npm run prod` (or `npm run dev`)
+2. Run tunnel: `ngrok http 8000`
+3. [api.slack.com/apps](https://api.slack.com/apps) → **Event Subscriptions** →  
+   `https://<your-ngrok-host>/api/v1/webhook/slack` (must show **Verified**)
+4. Subscribe to bot event **`message.channels`** (add **`message.groups`** for private channels)
+5. `/invite @YourBot` in each channel, then post a message
+
+### Production (no ngrok)
+
+Use your **deployed API hostname** — ngrok is not used in production:
+
+1. Deploy backend (e.g. `https://api.yourdomain.com`)
+2. Slack Event Subscriptions → `https://api.yourdomain.com/api/v1/webhook/slack`
+3. Set on the server: `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN`, `DEFAULT_ORG_ID` (must match Supabase `organizations.id`)
+4. Run **Celery worker** alongside the API (e.g. `npm run prod` or separate worker process)
+
+Env (dev or prod): `backend/.env.dev` / `backend/.env.production`

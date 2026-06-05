@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { Citation } from "@/common/services/api/client";
+import type { Citation } from "@/common/api/client";
 
 export type ChatMessage = {
   id: string;

@@ -9,6 +9,10 @@ class EmbeddingService:
         if settings.openai_api_key:
             self._client = AsyncOpenAI(api_key=settings.openai_api_key)
 
+    @property
+    def uses_openai_embeddings(self) -> bool:
+        return self._client is not None
+
     async def embed(self, text: str) -> list[float]:
         if not text.strip():
             raise ValueError("Cannot embed empty text")

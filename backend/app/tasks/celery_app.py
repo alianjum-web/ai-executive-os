@@ -6,6 +6,10 @@ celery_app = Celery(
     "sop_automator",
     broker=settings.redis_url_for_celery,
     backend=settings.redis_url_for_celery,
+    include=[
+        "app.tasks.document_tasks",
+        "app.tasks.slack_tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -15,3 +19,7 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
+
+# Worker entrypoint is `-A app.tasks.celery_app.celery_app` — import tasks here so they register.
+import app.tasks.document_tasks as _document_tasks  # noqa: F401
+import app.tasks.slack_tasks as _slack_tasks  # noqa: F401

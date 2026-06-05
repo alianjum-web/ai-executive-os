@@ -58,6 +58,31 @@ Two active files — never commit secrets:
 | `.env.dev` | `npm run dev` | Local Docker Postgres `:5433`, local Redis, development rules |
 | `.env.production` | `npm run prod` | Session pooler `DATABASE_URL`, Upstash `rediss://`, production validation |
 
+### Don't confuse: `ENV_FILE` vs `APP_ENV`
+
+These are **two separate knobs**. New contributors should read this before editing env files.
+
+| | **`ENV_FILE` (which file)** | **`APP_ENV` (behavior inside the file)** |
+|--|-----------------------------|------------------------------------------|
+| **Set by** | `npm` scripts: `ENV_FILE=.env.dev` or `ENV_FILE=.env.production` | A variable **inside** that file: `APP_ENV=development` or `APP_ENV=production` |
+| **Defined in code** | [`app/core/config.py`](app/core/config.py) — `os.getenv("ENV_FILE", ".env.dev")` | Same file — field `app_env` / `settings.is_development` |
+| **Controls** | `DATABASE_URL`, `REDIS_URL`, `SUPABASE_URL`, API keys, etc. | Auth strictness, startup validation, LLM production checks |
+
+**Common mistake:** changing only `APP_ENV=production` in `.env.dev` while running `npm run dev`.  
+That still loads **`.env.dev`** (local Docker DB), but disables dev auth headers and enables production rules.  
+**Correct prod-like test:** fill **`backend/.env.production`** and run **`npm run prod`**.
+
+```bash
+# Which file loads (backend)
+npm run dev   # ENV_FILE=.env.dev
+npm run prod  # ENV_FILE=.env.production
+
+# Manual uvicorn — must set ENV_FILE yourself
+ENV_FILE=.env.production .venv/bin/uvicorn app.main:app --reload
+```
+
+`main.py` lifespan does **not** choose env files; settings load once at import from `config.py`.
+
 Copy once:
 
 ```bash
@@ -317,6 +342,35 @@ Embeddings: prefer `OPENAI_API_KEY` for real vectors; without it, a dev hash fal
 
 ---
 
+## Static typing (Pyright)
+
+The backend uses **Pyright** so API and domain types stay unambiguous at edit time and in OpenAPI.
+
+| Layer | Location | Role |
+|-------|----------|------|
+| **ORM** | `app/models/db/tables.py` | SQLAlchemy tables |
+| **HTTP enums** | `app/models/http/enums.py` | `Literal` types (`UserRole`, `DocumentStatus`, …) |
+| **Request/response** | `app/models/http/schemas.py`, `errors.py` | Pydantic → OpenAPI + validation |
+| **OpenAPI docs** | `app/models/http/responses.py` | Error shapes in `/docs` (not OpenAI) |
+| **Domain (internal)** | `app/models/internal/domain.py` | `TypedDict` for RAG, citations |
+| **Coercion** | `app/models/internal/coerce.py` | Narrow DB strings into `Literal` types |
+| **Handlers** | `app/core/exception_handlers.py` | Every failure returns `ApiErrorResponse` |
+| **SSE stream** | `app/models/http/stream.py` | Typed token/done/error events |
+
+See [`app/models/README.md`](app/models/README.md) for the full folder map.
+
+From **repo root** or **`backend/`**:
+
+```bash
+npm run typecheck              # root → backend Pyright
+cd backend && npm run typecheck
+```
+
+Config: [`../pyrightconfig.json`](../pyrightconfig.json) (venv `backend/.venv`, `typeCheckingMode: standard`).  
+Dev dependency: `requirements-dev.txt` → `pyright`.
+
+---
+
 ## Tests
 
 ```bash
@@ -328,6 +382,8 @@ cd backend
 ---
 
 ## Dev vs production (backend)
+
+Use the **file** (`npm run dev` / `prod`) for URLs and secrets; keep **`APP_ENV`** aligned with that file (usually `development` in `.env.dev`, `production` in `.env.production`).
 
 | Variable | Development (`.env.dev`) | Production (`.env.production`) |
 |----------|--------------------------|--------------------------------|

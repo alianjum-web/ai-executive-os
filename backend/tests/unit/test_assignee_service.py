@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.models.database import User
+from app.models.db.tables import User
 from app.services.assignee_service import AssigneeService
 
 

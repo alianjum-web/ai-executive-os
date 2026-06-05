@@ -5,8 +5,12 @@ from fastapi import APIRouter, HTTPException, Request
 
 from app.core.config import settings
 from app.core.feature_flags import flags
+from app.core.slack_dedupe import slack_event_dedupe
+from app.core.slack_events import should_process_slack_message, slack_dedupe_key
 from app.core.slack_verify import verify_slack_signature
-from app.tasks.slack_tasks import process_slack_event_task
+from app.models.http.errors import SlackChallengeResponse, SlackWebhookAck
+from app.models.http.slack import SlackEventCallbackPayload
+from app.tasks.slack_tasks import enqueue_slack_event
 
 router = APIRouter()
 
@@ -25,20 +29,23 @@ async def slack_webhook(request: Request):
         request.headers.get("X-Slack-Signature"),
     )
 
-    payload = json.loads(body.decode("utf-8"))
+    payload: SlackEventCallbackPayload = json.loads(body.decode("utf-8"))
 
     if payload.get("type") == "url_verification":
-        return {"challenge": payload.get("challenge")}
+        challenge = payload.get("challenge") or ""
+        return SlackChallengeResponse(challenge=challenge)
 
     if payload.get("type") == "event_callback":
-        event = payload.get("event", {})
-        if event.get("type") == "message" and not event.get("subtype"):
-            resolved_org: uuid.UUID | None = None
-            if settings.default_org_id:
-                resolved_org = uuid.UUID(settings.default_org_id)
-            process_slack_event_task.delay(
-                payload,
-                str(resolved_org) if resolved_org else None,
-            )
+        event = payload.get("event") or {}
+        if should_process_slack_message(event):
+            dedupe_key = slack_dedupe_key(payload, event)
+            if await slack_event_dedupe.claim(dedupe_key):
+                resolved_org: uuid.UUID | None = None
+                if settings.default_org_id:
+                    resolved_org = uuid.UUID(settings.default_org_id)
+                enqueue_slack_event(
+                    payload,
+                    str(resolved_org) if resolved_org else None,
+                )
 
-    return {"ok": True}
+    return SlackWebhookAck()

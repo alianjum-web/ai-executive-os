@@ -3,9 +3,7 @@ import os
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Dev: .env.dev  |  Prod: .env.production  (set via npm scripts ENV_FILE=…)
 _ENV_FILE = os.getenv("ENV_FILE", ".env.dev")
-
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(

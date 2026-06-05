@@ -2,5 +2,14 @@
   "venvPath": "backend",
   "venv": ".venv",
   "extraPaths": ["backend"],
-  "include": ["backend"]
+  "include": ["backend/app", "backend/scripts", "backend/tests"],
+  "exclude": ["backend/.venv", "**/__pycache__"],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard",
+  "reportMissingTypeStubs": false,
+  "reportPrivateUsage": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "reportTypedDictNotRequiredAccess": false
 }

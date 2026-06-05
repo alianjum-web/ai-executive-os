@@ -2,28 +2,41 @@ import json
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.database import QueryLog
-from app.models.schemas import Citation, QueryResponse
+from app.models.db.tables import QueryLog
+from app.models.internal.domain import (
+    CitationRaw,
+    GradedRagChunkItem,
+    RagChunkItem,
+    as_graded_chunks,
+)
+from app.models.http.schemas import Citation, QueryResponse
+from app.models.http.stream import StreamDoneEvent, citation_to_json
 from app.services.embedding_service import EmbeddingService
 from app.services.grading_service import GradingService
 from app.services.llm_service import LLMService
 from app.services.rerank_service import RerankService
+from app.services.citation_parser import parse_knowledge_answer
+from app.services.rag_context import format_rag_context
 from app.services.vector_service import VectorService
 
 
 class KnowledgeState(TypedDict, total=False):
     query: str
     parsed_query: str
-    chunk_items: list[dict]
+    chunk_items: list[GradedRagChunkItem]
     context: str
     answer: str
-    citations: list[dict]
+    citations: list[CitationRaw]
+
+
+# LangGraph node partial returns use the same shape as state updates.
+KnowledgeStateUpdate = KnowledgeState
 
 
 class KnowledgeAgent:
@@ -50,26 +63,31 @@ class KnowledgeAgent:
         workflow.add_edge("format_citations", END)
         return workflow.compile()
 
-    async def _parse_query(self, state: KnowledgeState) -> dict:
-        return {"parsed_query": state["query"].strip()}
+    async def _parse_query(self, state: KnowledgeState) -> KnowledgeStateUpdate:
+        return {"parsed_query": state.get("query", "").strip()}
 
-    async def _grade_relevance(self, state: KnowledgeState) -> dict:
+    async def _grade_relevance(self, state: KnowledgeState) -> KnowledgeStateUpdate:
+        chunks = list(state.get("chunk_items", []))
         graded = await self.grader.filter_chunks(
-            state["parsed_query"],
-            list(state.get("chunk_items", [])),
+            state.get("parsed_query", state.get("query", "")),
+            chunks,
             min_grade=settings.min_relevance_grade,
         )
+        if not graded and chunks:
+            graded = sorted(chunks, key=lambda c: c.get("score", 0), reverse=True)[
+                : settings.rerank_top_k
+            ]
         return {"chunk_items": graded}
 
-    async def _rerank_chunks(self, state: KnowledgeState) -> dict:
+    async def _rerank_chunks(self, state: KnowledgeState) -> KnowledgeStateUpdate:
         reranked = await self.reranker.rerank(
-            state["parsed_query"],
+            state.get("parsed_query", state.get("query", "")),
             list(state.get("chunk_items", [])),
             top_n=settings.rerank_top_k,
         )
         return {"chunk_items": reranked}
 
-    async def _generate_answer(self, state: KnowledgeState) -> dict:
+    async def _generate_answer(self, state: KnowledgeState) -> KnowledgeStateUpdate:
         items = state.get("chunk_items", [])
         if not items:
             return {
@@ -79,16 +97,25 @@ class KnowledgeAgent:
                 ),
                 "context": "",
             }
-        context = "\n\n---\n\n".join(i["content"] for i in items)
-        answer = await self.llm.generate_answer(state["parsed_query"], context)
-        return {"answer": answer, "context": context}
+        context = format_rag_context(items)
+        parsed = state.get("parsed_query", state.get("query", ""))
+        raw_answer = await self.llm.generate_answer(parsed, context)
+        answer, citations = parse_knowledge_answer(
+            raw_answer, list(state.get("chunk_items", []))
+        )
+        return {"answer": answer, "context": context, "citations": citations}
 
-    async def _format_citations(self, state: KnowledgeState) -> dict:
+    async def _format_citations(self, state: KnowledgeState) -> KnowledgeStateUpdate:
+        if state.get("citations"):
+            return {"citations": state["citations"]}
         citations = []
         for item in state.get("chunk_items", []):
             citations.append(
                 {
                     "chunk_id": str(item["chunk_id"]),
+                    "document_id": str(item["document_id"])
+                    if item.get("document_id")
+                    else None,
                     "document_name": item["document_name"],
                     "page_number": item.get("page_number"),
                     "chunk_text": item["content"],
@@ -99,19 +126,22 @@ class KnowledgeAgent:
 
     async def _retrieve(
         self, db: AsyncSession, query: str, org_id: uuid.UUID | None
-    ) -> list[dict]:
+    ) -> list[RagChunkItem]:
         embedding = await self.embedder.embed(query)
+        min_score = 0.2 if self.embedder.uses_openai_embeddings else 0.0
         rows = await self.vector.similarity_search(
             db,
             embedding,
             org_id=org_id,
             top_k=settings.retrieval_top_k,
+            min_score=min_score,
         )
-        items: list[dict] = []
+        items: list[RagChunkItem] = []
         for chunk, score, document in rows:
             items.append(
                 {
                     "chunk_id": chunk.id,
+                    "document_id": document.id,
                     "content": chunk.content,
                     "document_name": document.filename,
                     "page_number": chunk.page_number,
@@ -120,17 +150,34 @@ class KnowledgeAgent:
             )
         return items
 
-    def _build_citation_models(self, raw: list[dict]) -> list[Citation]:
-        return [
-            Citation(
-                chunk_id=uuid.UUID(c["chunk_id"]) if c.get("chunk_id") else None,
-                document_name=c["document_name"],
-                page_number=c.get("page_number"),
-                chunk_text=c["chunk_text"],
-                excerpt=c.get("excerpt"),
+    @staticmethod
+    def _to_uuid(value: str | uuid.UUID | None) -> uuid.UUID | None:
+        if value is None:
+            return None
+        if isinstance(value, uuid.UUID):
+            return value
+        return uuid.UUID(str(value))
+
+    def _build_citation_models(self, raw: list[CitationRaw]) -> list[Citation]:
+        citations: list[Citation] = []
+        for c in raw:
+            chunk_id = c.get("chunk_id")
+            doc_id = c.get("document_id")
+            doc_name = c.get("document_name") or "unknown"
+            chunk_text = c.get("chunk_text") or ""
+            citations.append(
+                Citation(
+                    chunk_id=self._to_uuid(chunk_id),
+                    document_id=self._to_uuid(doc_id),
+                    document_name=doc_name,
+                    page_number=c.get("page_number"),
+                    chunk_text=chunk_text,
+                    excerpt=c.get("excerpt"),
+                    exact_quote_highlight=c.get("exact_quote_highlight"),
+                    citation_index=c.get("citation_index"),
+                )
             )
-            for c in raw
-        ]
+        return citations
 
     async def _save_query_log(
         self,
@@ -171,7 +218,8 @@ class KnowledgeAgent:
         session_id: str | None = None,
     ) -> QueryResponse:
         start = time.perf_counter()
-        chunk_items = await self._retrieve(db, query, org_id)
+        retrieved = await self._retrieve(db, query, org_id)
+        chunk_items = as_graded_chunks(retrieved)
         final_state = await self.graph.ainvoke(
             {"query": query, "chunk_items": chunk_items}
         )
@@ -190,7 +238,9 @@ class KnowledgeAgent:
         )
         return QueryResponse(answer=answer, citations=citations, latency_ms=latency_ms)
 
-    async def _pipeline_through_rerank(self, query: str, chunk_items: list[dict]) -> KnowledgeState:
+    async def _pipeline_through_rerank(
+        self, query: str, chunk_items: list[GradedRagChunkItem]
+    ) -> KnowledgeState:
         state: KnowledgeState = {"query": query, "chunk_items": chunk_items}
         state.update(await self._parse_query(state))
         state.update(await self._grade_relevance(state))
@@ -208,33 +258,36 @@ class KnowledgeAgent:
         session_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         start = time.perf_counter()
-        chunk_items = await self._retrieve(db, query, org_id)
+        retrieved = await self._retrieve(db, query, org_id)
+        chunk_items = as_graded_chunks(retrieved)
         pipeline_state = await self._pipeline_through_rerank(query, chunk_items)
         items = pipeline_state.get("chunk_items", [])
-        context = "\n\n---\n\n".join(i["content"] for i in items) if items else ""
+        context = format_rag_context(items) if items else ""
         citations = self._build_citation_models(pipeline_state.get("citations", []))
 
-        full_answer = ""
+        raw_answer = ""
         async for token in self.llm.stream_answer(query, context):
-            full_answer += token
+            raw_answer += token
             yield json.dumps({"type": "token", "content": token}) + "\n"
+
+        clean_answer, parsed_raw = parse_knowledge_answer(raw_answer, items)
+        citations = self._build_citation_models(parsed_raw or pipeline_state.get("citations", []))
 
         latency_ms = int((time.perf_counter() - start) * 1000)
         await self._save_query_log(
             db,
             query=query,
-            answer=full_answer,
+            answer=clean_answer,
             citations=citations,
             user_id=user_id,
             org_id=org_id,
             latency_ms=latency_ms,
             session_id=session_id,
         )
-        yield json.dumps(
-            {
-                "type": "done",
-                "answer": full_answer,
-                "citations": [c.model_dump(mode="json") for c in citations],
-                "latency_ms": latency_ms,
-            }
-        ) + "\n"
+        done: StreamDoneEvent = {
+            "type": "done",
+            "answer": clean_answer,
+            "citations": [citation_to_json(c) for c in citations],
+            "latency_ms": latency_ms,
+        }
+        yield json.dumps(done) + "\n"

@@ -60,6 +60,17 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon-key from Supabase dashboard>
 
 Use the **project root URL** for Supabase (`https://<ref>.supabase.co`) — not the Data API path `/rest/v1/`.
 
+### Don't confuse: which file loads (frontend vs backend)
+
+| App | How the file is chosen | Notes |
+|-----|------------------------|--------|
+| **Frontend** | `npm run dev` → `source .env.dev`; `npm run prod` → `source .env.production` | No `APP_ENV` on the frontend — only `NEXT_PUBLIC_*` vars. |
+| **Backend** | `npm run dev` / `prod` set shell `ENV_FILE=.env.dev` or `.env.production` | See [`../backend/README.md`](../backend/README.md#dont-confuse-env_file-vs-app_env): **`APP_ENV` does not switch files**. |
+
+**Rule for both:** run `npm run dev` for local Docker + dev keys; run `npm run prod` for production-like URLs. Do not set `APP_ENV=production` in `.env.dev` and expect backend to read `.env.production`.
+
+Monorepo explanation: [`../README.md`](../README.md#dont-confuse-which-env-file-loads-vs-app_env-backend)
+
 ---
 
 ## First time only (new contributor)
@@ -244,9 +255,24 @@ Full three-file map (frontend + backend): [`../docs/CORE_FILES.md`](../docs/CORE
 
 ---
 
+## Static typing (TypeScript)
+
+Contracts mirror the backend under [`src/common/types/http/`](src/common/types/http/) (`enums`, `schemas`, `errors`, `stream-events`). HTTP calls go through [`src/common/api/`](src/common/api/) and parse `ApiErrorResponse` on failures.
+
+```bash
+npm run typecheck              # tsc --noEmit (strict)
+# From repo root:
+npm run typecheck:frontend
+```
+
+When you change a backend Pydantic model, update the matching file in `src/common/types/` before merging.
+
+---
+
 ## Tests and quality
 
 ```bash
+npm run typecheck
 npm run lint
 npm test
 npm run test:e2e   # requires app running; see playwright config
@@ -275,3 +301,4 @@ npm run test:e2e   # requires app running; see playwright config
 | **Daily dev (frontend only)** | `cd frontend && npm run dev` |
 | **Prod-like test (full stack)** | Root: `npm run prod` |
 | **Prod-like test (frontend only)** | `cd frontend && npm run prod` |
+| **Typecheck** | `npm run typecheck` (here) or root `npm run typecheck` (backend + frontend) |

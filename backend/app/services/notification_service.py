@@ -1,5 +1,5 @@
 from app.core.config import settings
-from app.models.database import Ticket, User
+from app.models.db.tables import Ticket, User
 
 
 class NotificationService:

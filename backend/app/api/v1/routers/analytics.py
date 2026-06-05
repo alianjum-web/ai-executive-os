@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.feature_flags import flags
 from app.core.security import AuthContext, require_admin, tenant_org_id
-from app.models.schemas import AnalyticsDashboard
+from app.models.http.schemas import AnalyticsDashboard
 from app.services.analytics_service import AnalyticsService
 
 router = APIRouter()

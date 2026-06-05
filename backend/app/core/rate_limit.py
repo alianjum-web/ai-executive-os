@@ -1,8 +1,6 @@
 from fastapi import Request
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter
 from slowapi.util import get_remote_address
-from starlette.responses import Response
 
 
 def user_rate_limit_key(request: Request) -> str:
@@ -20,10 +18,3 @@ def org_rate_limit_key(request: Request) -> str:
 
 
 limiter = Limiter(key_func=user_rate_limit_key)
-
-
-def rate_limit_exceeded_handler(request: Request, exc: Exception) -> Response:
-    """Typed wrapper for FastAPI; delegates to slowapi's handler."""
-    if not isinstance(exc, RateLimitExceeded):
-        raise exc
-    return _rate_limit_exceeded_handler(request, exc)

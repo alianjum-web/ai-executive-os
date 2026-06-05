@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from app.core.config import settings
 from app.core.feature_registry import VALID_AI_PROVIDERS, get_ai_model_config, get_ai_provider
+from app.models.http.enums import AiProviderId
+from app.models.http.llm import AiProviderPlugin, AiProviderStatus
+from app.models.internal.coerce import as_ai_provider_id
 
 logger = logging.getLogger(__name__)
 
-_API_KEY_FIELDS = {
+_API_KEY_FIELDS: dict[AiProviderId, str] = {
     "openai": "openai_api_key",
     "anthropic": "anthropic_api_key",
     "gemini": "gemini_api_key",
@@ -18,30 +20,36 @@ _API_KEY_FIELDS = {
 }
 
 
-def resolve_active_chat_provider_id() -> str:
+def resolve_active_chat_provider_id() -> AiProviderId:
     return get_ai_provider()
 
 
-def get_active_plugin() -> dict[str, str]:
+def get_active_plugin() -> AiProviderPlugin:
     pid = get_ai_provider()
     cfg = get_ai_model_config(pid)
-    return {"id": pid, "label": cfg["name"], **cfg}
+    return AiProviderPlugin(
+        id=pid,
+        label=cfg.name,
+        chat_model=cfg.chat_model,
+        grading_model=cfg.grading_model,
+    )
 
 
-def list_provider_status() -> list[dict[str, Any]]:
+def list_provider_status() -> list[AiProviderStatus]:
     active = get_ai_provider()
-    out: list[dict[str, Any]] = []
-    for pid in sorted(VALID_AI_PROVIDERS):
+    out: list[AiProviderStatus] = []
+    for pid_raw in sorted(VALID_AI_PROVIDERS):
+        pid = as_ai_provider_id(pid_raw)
         cfg = get_ai_model_config(pid)
         field = _API_KEY_FIELDS[pid]
         out.append(
-            {
-                "id": pid,
-                "label": cfg["name"],
-                "configured": bool(getattr(settings, field, "")),
-                "active": pid == active,
-                "chat_model": cfg["chat_model"],
-            }
+            AiProviderStatus(
+                id=pid,
+                label=cfg.name,
+                configured=bool(getattr(settings, field, "")),
+                active=pid == active,
+                chat_model=cfg.chat_model,
+            )
         )
     return out
 
@@ -63,41 +71,3 @@ def validate_active_provider() -> list[str]:
         }[pid]
         errors.append(f"{env_key} required for ai_provider={pid} in production")
     return errors
-
-
-def build_llm_provider():
-    from app.services.llm_providers import (
-        AnthropicProvider,
-        GeminiProvider,
-        GroqProvider,
-        OpenAIProvider,
-    )
-
-    pid = get_ai_provider()
-    cfg = get_ai_model_config(pid)
-    factories = {
-        "openai": lambda: OpenAIProvider(model=cfg["chat_model"]),
-        "anthropic": lambda: AnthropicProvider(model=cfg["chat_model"]),
-        "gemini": lambda: GeminiProvider(model=cfg["chat_model"]),
-        "groq": lambda: GroqProvider(model=cfg["chat_model"]),
-    }
-    return factories[pid]()
-
-
-def build_grading_provider():
-    from app.services.llm_providers import (
-        AnthropicProvider,
-        GeminiProvider,
-        GroqProvider,
-        OpenAIProvider,
-    )
-
-    pid = get_ai_provider()
-    cfg = get_ai_model_config(pid)
-    factories = {
-        "openai": lambda: OpenAIProvider(model=cfg["grading_model"]),
-        "anthropic": lambda: AnthropicProvider(model=cfg["grading_model"]),
-        "gemini": lambda: GeminiProvider(model=cfg["grading_model"]),
-        "groq": lambda: GroqProvider(model=cfg["grading_model"]),
-    }
-    return factories[pid]()

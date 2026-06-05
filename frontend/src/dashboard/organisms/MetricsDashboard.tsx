@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { analyticsPolling } from "@/common/config/polling.config";
+import { useVisibilityPolling } from "@/common/hooks/useVisibilityPolling";
 import {
   Bar,
   BarChart,
@@ -10,7 +12,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { fetchAnalytics, type AnalyticsDashboard } from "@/common/services/api/client";
+import { isApiUnreachableError } from "@/common/api/fetch";
+import { fetchAnalytics, type AnalyticsDashboard } from "@/common/api/client";
 import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/common/atoms/ui/card";
 import { Skeleton } from "@/common/atoms/ui/skeleton";
@@ -44,7 +47,9 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 export function MetricsDashboard() {
   const enabled = useFeatureFlag("ANALYTICS_DASHBOARD_ENABLED");
   const [metrics, setMetrics] = useState<AnalyticsDashboard | null>(null);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const [apiUnreachable, setApiUnreachable] = useState(false);
   const [chartColors, setChartColors] = useState({
     tick: "#94a3b8",
     grid: "#243047",
@@ -53,38 +58,35 @@ export function MetricsDashboard() {
     tooltipFg: "#f8fafc",
   });
 
-  const load = async () => {
+  const showLoadingOnNextPoll = useRef(enabled);
+
+  const load = useCallback(async () => {
+    if (!enabled) return;
+    if (showLoadingOnNextPoll.current) {
+      showLoadingOnNextPoll.current = false;
+      setIsLoading(true);
+    }
     try {
       setMetrics(await fetchAnalytics());
       setError(null);
+      setApiUnreachable(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load metrics");
+      if (isApiUnreachableError(e)) setApiUnreachable(true);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [enabled]);
 
   useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    const run = async () => {
-      try {
-        const data = await fetchAnalytics();
-        if (!cancelled) {
-          setMetrics(data);
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load metrics");
-        }
-      }
-    };
-    void run();
-    const interval = setInterval(() => void run(), 10000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    if (enabled) showLoadingOnNextPoll.current = true;
   }, [enabled]);
+
+  useVisibilityPolling({
+    enabled: enabled && !apiUnreachable,
+    onPoll: load,
+    ...analyticsPolling,
+  });
 
   useEffect(() => {
     const sync = () => {
@@ -109,7 +111,7 @@ export function MetricsDashboard() {
   if (error) {
     return <ErrorState message={error} onRetry={load} />;
   }
-  if (!metrics) {
+  if (isLoading && !metrics) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -117,6 +119,9 @@ export function MetricsDashboard() {
         ))}
       </div>
     );
+  }
+  if (!metrics) {
+    return null;
   }
 
   const chartData = metrics.top_questions.map((q) => ({

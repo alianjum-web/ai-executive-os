@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { parseAssistantContent } from "@/chat/lib/parseAssistantContent";
 import { useQueryStream } from "@/chat/hooks/useQueryStream";
 import { useAppDispatch, useAppSelector } from "@/common/store/hooks";
 import {
@@ -38,26 +39,32 @@ export function useChat() {
 
       try {
         const result = await streamQuery(text, (accumulated) => {
+          const { displayText } = parseAssistantContent(accumulated);
           dispatch(
             updateAssistantMessage({
               id: assistantId,
-              content: accumulated,
+              content: displayText,
             })
           );
         });
+        const { displayText } = parseAssistantContent(result.answer);
         dispatch(
           updateAssistantMessage({
             id: assistantId,
-            content: result.answer,
+            content: displayText,
             citations: result.citations,
           })
         );
       } catch (err) {
+        const raw =
+          err instanceof Error ? err.message : "Failed to get a response.";
+        const content = raw.toLowerCase().includes("network")
+          ? "Cannot reach the API. Start the backend: `cd backend && npm run prod` (port 8000), then retry."
+          : raw;
         dispatch(
           updateAssistantMessage({
             id: assistantId,
-            content:
-              err instanceof Error ? err.message : "Failed to get a response.",
+            content,
           })
         );
       } finally {

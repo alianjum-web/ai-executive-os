@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models.schemas import QueryResponse
+from app.models.http.schemas import QueryResponse
 
 ORG_1 = uuid.uuid4()
 ORG_2 = uuid.uuid4()

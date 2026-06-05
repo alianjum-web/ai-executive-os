@@ -13,7 +13,7 @@ export function AttentionPanel() {
   const { tickets, isLoading, error } = useTickets();
 
   const openTickets = tickets.filter(
-    (t) => t.status !== "ready" && t.status !== "error"
+    (t) => t.status === "open" || t.status === "in_progress"
   ).length;
 
   return (

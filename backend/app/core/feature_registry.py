@@ -6,9 +6,12 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.core.config import settings
+from app.models.http.enums import AiProviderId
+from app.models.http.features import FeaturesPublicConfig
+from app.models.http.llm import AiModelConfig
 
 _CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "features.json"
 VALID_AI_PROVIDERS = frozenset({"openai", "gemini", "groq", "anthropic"})
@@ -38,7 +41,7 @@ def is_enabled(name: str) -> bool:
     return _parse_bool(features.get(name, False))
 
 
-def get_ai_provider() -> str:
+def get_ai_provider() -> AiProviderId:
     """
     Which AI vendor runs chat + grading.
     Override: LLM_PROVIDER or AI_PROVIDER in .env
@@ -47,38 +50,48 @@ def get_ai_provider() -> str:
         if env_name in os.environ:
             value = os.environ[env_name].strip().lower()
             if value in VALID_AI_PROVIDERS:
-                return value
+                return cast(AiProviderId, value)
     if settings.llm_provider and settings.llm_provider.lower() in VALID_AI_PROVIDERS:
-        return settings.llm_provider.lower()
+        return cast(AiProviderId, settings.llm_provider.lower())
     value = str(_load().get("ai_provider", "gemini")).strip().lower()
-    return value if value in VALID_AI_PROVIDERS else "gemini"
+    return cast(AiProviderId, value if value in VALID_AI_PROVIDERS else "gemini")
 
 
-def get_ai_model_config(provider: str | None = None) -> dict[str, str]:
-    pid = (provider or get_ai_provider()).lower()
+def _resolve_provider(provider: AiProviderId | str | None) -> AiProviderId:
+    if provider is None:
+        return get_ai_provider()
+    key = provider if isinstance(provider, str) else provider
+    lowered = key.lower() if isinstance(key, str) else key
+    if lowered in VALID_AI_PROVIDERS:
+        return cast(AiProviderId, lowered)
+    return get_ai_provider()
+
+
+def get_ai_model_config(provider: AiProviderId | str | None = None) -> AiModelConfig:
+    pid = _resolve_provider(provider)
     models = _load().get("ai_models", {})
     if pid not in models:
-        return {"name": pid, "chat_model": "", "grading_model": ""}
+        return AiModelConfig(name=pid, chat_model="", grading_model="")
     raw = models[pid]
-    return {
-        "name": raw.get("name", pid),
-        "chat_model": raw.get("chat_model", ""),
-        "grading_model": raw.get("grading_model", ""),
-    }
+    return AiModelConfig(
+        name=raw.get("name", pid),
+        chat_model=raw.get("chat_model", ""),
+        grading_model=raw.get("grading_model", ""),
+    )
 
 
-def get_public_config() -> dict[str, Any]:
+def get_public_config() -> FeaturesPublicConfig:
     """Payload for GET /api/v1/config/features (frontend + documentation)."""
     features = _load().get("features", {})
     resolved = {name: is_enabled(name) for name in features}
     provider = get_ai_provider()
     model = get_ai_model_config(provider)
-    return {
-        "ai_provider": provider,
-        "ai_model_name": model["name"],
-        "ai_chat_model": model["chat_model"],
-        "features": resolved,
-    }
+    return FeaturesPublicConfig(
+        ai_provider=provider,
+        ai_model_name=model.name,
+        ai_chat_model=model.chat_model,
+        features=resolved,
+    )
 
 
 def clear_cache() -> None:

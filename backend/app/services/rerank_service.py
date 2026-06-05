@@ -1,10 +1,16 @@
 from app.core.config import settings
+from app.models.internal.domain import GradedRagChunkItem, RagChunkItem
 
 
 class RerankService:
     """Re-order chunks using Cohere Rerank API with score-based fallback."""
 
-    async def rerank(self, query: str, chunks: list[dict], top_n: int | None = None) -> list[dict]:
+    async def rerank(
+        self,
+        query: str,
+        chunks: list[GradedRagChunkItem],
+        top_n: int | None = None,
+    ) -> list[GradedRagChunkItem]:
         if not chunks:
             return []
         top_n = top_n or settings.rerank_top_k

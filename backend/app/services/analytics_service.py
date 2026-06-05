@@ -4,13 +4,14 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Document, QueryLog
+from app.models.db.tables import Document, QueryLog
+from app.models.internal.domain import AnalyticsMetrics, TopQuestionRow
 
 
 class AnalyticsService:
     async def get_dashboard_metrics(
         self, db: AsyncSession, org_id: uuid.UUID
-    ) -> dict:
+    ) -> AnalyticsMetrics:
         today_start = datetime.now(timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
@@ -46,8 +47,8 @@ class AnalyticsService:
             .limit(10)
         )
         top_rows = (await db.execute(top_questions_stmt)).all()
-        top_questions = [
-            {"question": row[0], "count": row[1]} for row in top_rows
+        top_questions: list[TopQuestionRow] = [
+            {"question": row[0], "count": int(row[1])} for row in top_rows
         ]
 
         return {

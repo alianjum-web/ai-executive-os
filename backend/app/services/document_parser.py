@@ -19,13 +19,15 @@ class DocumentParser:
     def _parse_pdf(self, path: Path) -> list[tuple[str, int | None]]:
         import fitz
 
-        doc = fitz.open(path)
+        doc: fitz.Document = fitz.open(path)
         pages: list[tuple[str, int | None]] = []
-        for i, page in enumerate(doc):
-            text = page.get_text().strip()
-            if text:
-                pages.append((text, i + 1))
-        doc.close()
+        try:
+            for i in range(doc.page_count):
+                text = str(doc[i].get_text()).strip()
+                if text:
+                    pages.append((text, i + 1))
+        finally:
+            doc.close()
         if not pages:
             return [("", None)]
         return pages

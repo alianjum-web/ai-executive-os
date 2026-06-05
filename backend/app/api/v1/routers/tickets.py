@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.feature_flags import flags
 from app.core.security import AuthContext, get_current_user, tenant_org_id
-from app.models.schemas import TicketResponse
+from app.models.http.schemas import TicketResponse
+from app.models.internal.coerce import as_ticket_source, as_ticket_status
 from app.services.ticket_service import TicketService
 
 router = APIRouter()
@@ -26,13 +27,13 @@ async def list_tickets(
     return [
         TicketResponse(
             id=t.id,
-            source=t.source,
+            source=as_ticket_source(t.source),
             title=t.title or t.summary,
             intent=t.intent,
             priority=t.priority,
             summary=t.summary,
             department=t.department,
-            status=t.status,
+            status=as_ticket_status(t.status),
             assignee_email=t.assignee.email if t.assignee else None,
             assignee_name=t.assignee.full_name if t.assignee else None,
             assignee_id=t.assignee_id,

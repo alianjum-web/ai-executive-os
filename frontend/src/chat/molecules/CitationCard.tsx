@@ -1,4 +1,4 @@
-import type { Citation } from "@/common/services/api/client";
+import type { Citation } from "@/common/api/client";
 
 export function CitationCard({ citation }: { citation: Citation }) {
   return (

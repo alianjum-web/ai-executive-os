@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_context import AuthContext
-from app.models.database import Organization, User
+from app.models.db.tables import Organization, User
 
 
 def _slugify(name: str) -> str:

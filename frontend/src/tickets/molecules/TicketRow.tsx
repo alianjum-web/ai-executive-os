@@ -1,5 +1,5 @@
 import { Badge } from "@/common/atoms/Badge";
-import type { TicketRecord } from "@/common/services/api/client";
+import type { TicketRecord } from "@/common/api/client";
 import { cn } from "@/common/lib/utils";
 
 const priorityColors: Record<number, string> = {

@@ -10,6 +10,7 @@
     "build:prod": "bash -c 'set -a && source .env.production && set +a && exec next build'",
     "start": "bash -c 'set -a && source .env.dev && set +a && exec next start'",
     "start:prod": "bash -c 'set -a && source .env.production && set +a && exec next start'",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",

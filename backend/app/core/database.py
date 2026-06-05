@@ -1,16 +1,30 @@
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 from app.core.db_connect import async_connect_args
 
+_connect_args = async_connect_args(settings.database_url)
+
 engine = create_async_engine(
     settings.database_url,
     echo=False,
-    connect_args=async_connect_args(settings.database_url),
+    connect_args=_connect_args,
 )
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+# Celery prefork workers: avoid pooled asyncpg connections across asyncio.run() calls.
+celery_engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    poolclass=NullPool,
+    connect_args=_connect_args,
+)
+CeleryAsyncSessionLocal = async_sessionmaker(
+    celery_engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

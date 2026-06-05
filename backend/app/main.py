@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.routers import analytics, health, ingest, profile, query, tickets, webhooks
 from app.core.config import settings
+from app.core.exception_handlers import register_exception_handlers
 
 API_DESCRIPTION = """
 ## SOP Automator API
@@ -27,6 +28,8 @@ For local dev (`APP_ENV=development`), you may use headers: `X-Org-Id`, `X-User-
 """
 
 
+# Optional startup/shutdown hook (uvicorn logs start/stop either way).
+# Add code before/after yield for prod checks, Sentry, or closing DB/Redis pools.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
@@ -41,6 +44,8 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+
+register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
