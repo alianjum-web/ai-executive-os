@@ -1,3 +1,5 @@
+"""Lightweight RAG trace spans — logs duration/attrs for knowledge agent debugging."""
+
 import logging
 import time
 import uuid
@@ -8,6 +10,8 @@ logger = logging.getLogger("sop_automator.trace")
 
 
 class TraceSpan:
+    """One timed step in the RAG pipeline (embed, retrieve, grade, generate)."""
+
     def __init__(self, name: str, *, parent_id: str | None = None) -> None:
         self.span_id = uuid.uuid4().hex[:16]
         self.trace_id = parent_id or self.span_id

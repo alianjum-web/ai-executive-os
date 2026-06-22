@@ -14,6 +14,8 @@ export type NavItem = {
   description: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  /** Visible to admin and manager (not employee). */
+  leadershipOnly?: boolean;
   flag?: FeatureFlag;
 };
 
@@ -55,6 +57,6 @@ export const secondaryNav: NavItem[] = [
     description: "Usage & performance",
     icon: BarChart3,
     flag: "ANALYTICS_DASHBOARD_ENABLED",
-    adminOnly: true,
+    leadershipOnly: true,
   },
 ];

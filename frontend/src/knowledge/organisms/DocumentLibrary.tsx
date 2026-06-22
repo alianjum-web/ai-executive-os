@@ -13,10 +13,13 @@ import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
 import { ErrorState } from "@/common/molecules/ErrorState";
 import { EmptyState } from "@/common/molecules/EmptyState";
 import { LoadingBlock } from "@/common/molecules/LoadingBlock";
+import { DocumentAccessEditor } from "@/knowledge/molecules/DocumentAccessEditor";
 
 export function DocumentLibrary() {
   const uploadEnabled = useFeatureFlag("DOCUMENT_UPLOAD_ENABLED");
+  const rbacEnabled = useFeatureFlag("DOCUMENT_RBAC_ENABLED");
   const { isAdmin } = useRole();
+  const [editingAccessId, setEditingAccessId] = useState<string | null>(null);
   const { documents, isUploading, error, apiUnreachable, upload, refresh, isLoading } =
     useDocumentUpload();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -67,6 +70,11 @@ export function DocumentLibrary() {
                   <th className="px-4 py-3.5 font-medium" scope="col">
                     Uploaded
                   </th>
+                  {rbacEnabled ? (
+                    <th className="px-4 py-3.5 font-medium" scope="col">
+                      Access
+                    </th>
+                  ) : null}
                   {isAdmin ? (
                     <th className="px-4 py-3.5 font-medium" scope="col">
                       Actions
@@ -89,6 +97,45 @@ export function DocumentLibrary() {
                     <td className="px-4 py-3.5 text-muted-foreground">
                       {new Date(doc.created_at).toLocaleString()}
                     </td>
+                    {rbacEnabled ? (
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                        <div>
+                          {doc.source_connector ? `${doc.source_connector} · ` : ""}
+                          {doc.allowed_departments?.length
+                            ? `dept: ${doc.allowed_departments.join(", ")}`
+                            : "all depts"}
+                          {" · "}
+                          {doc.allowed_roles?.length
+                            ? `roles: ${doc.allowed_roles.join(", ")}`
+                            : "all roles"}
+                        </div>
+                        {isAdmin ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="mt-1 h-7 px-2"
+                              onClick={() =>
+                                setEditingAccessId(
+                                  editingAccessId === doc.id ? null : doc.id
+                                )
+                              }
+                            >
+                              {editingAccessId === doc.id ? "Close" : "Edit"}
+                            </Button>
+                            {editingAccessId === doc.id ? (
+                              <DocumentAccessEditor
+                                document={doc}
+                                onSaved={() => {
+                                  setEditingAccessId(null);
+                                  void refresh({ background: true });
+                                }}
+                              />
+                            ) : null}
+                          </>
+                        ) : null}
+                      </td>
+                    ) : null}
                     {isAdmin ? (
                       <td className="px-4 py-3.5">
                         <Button

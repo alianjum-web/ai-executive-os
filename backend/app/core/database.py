@@ -1,3 +1,10 @@
+"""
+SQLAlchemy async sessions for API and Celery.
+
+FastAPI uses pooled AsyncSessionLocal; Celery uses NullPool (prefork + asyncio.run
+per task). All tenant data flows through these sessions into Supabase Postgres.
+"""
+
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

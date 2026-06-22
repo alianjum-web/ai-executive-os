@@ -13,3 +13,7 @@ __pycache__/
 *.pem
 .DS_Store
 /tmp/uploads/
+
+# Supabase CLI local state
+supabase/.branches
+supabase/.temp

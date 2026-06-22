@@ -7,6 +7,7 @@
     "dev": "bash -c 'set -a && source .env.dev && set +a && exec next dev'",
     "prod": "bash -c 'set -a && source .env.production && set +a && exec next dev'",
     "build": "bash -c 'set -a && source .env.dev && set +a && exec next build'",
+    "build:ci": "next build",
     "build:prod": "bash -c 'set -a && source .env.production && set +a && exec next build'",
     "start": "bash -c 'set -a && source .env.dev && set +a && exec next start'",
     "start:prod": "bash -c 'set -a && source .env.production && set +a && exec next start'",
@@ -30,7 +31,7 @@
     "react-dom": "19.2.4",
     "react-hook-form": "^7.77.0",
     "react-redux": "^9.2.0",
-    "recharts": "^2.15.4",
+    "recharts": "^3.8.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

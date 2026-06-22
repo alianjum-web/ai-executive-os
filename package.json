@@ -8,7 +8,9 @@
     "setup": "npm run setup --prefix backend && npm install --prefix frontend",
     "typecheck": "npm run typecheck --prefix backend && npm run typecheck --prefix frontend",
     "typecheck:backend": "npm run typecheck --prefix backend",
-    "typecheck:frontend": "npm run typecheck --prefix frontend"
+    "typecheck:frontend": "npm run typecheck --prefix frontend",
+    "test:ci": "npm run test:ci --prefix backend && npm test --prefix frontend -- --ci",
+    "build:ci": "npm run build:ci --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

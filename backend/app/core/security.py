@@ -1,3 +1,10 @@
+"""
+Request authentication boundary for every protected route.
+
+Resolves JWT → AuthContext (org, user, role); syncs tenant rows via tenant_sync.
+Production: Supabase JWT only. Development: optional X-Org-Id / X-User-Id headers.
+"""
+
 import uuid
 
 import jwt
@@ -89,6 +96,16 @@ def require_admin(auth: AuthContext = Depends(get_current_user)) -> AuthContext:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin role required",
+        )
+    return auth
+
+
+def require_leadership(auth: AuthContext = Depends(get_current_user)) -> AuthContext:
+    """Admin or manager — analytics, executive summary, evaluation."""
+    if auth.role not in ("admin", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or manager role required",
         )
     return auth
 

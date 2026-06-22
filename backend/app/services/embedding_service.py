@@ -1,9 +1,13 @@
+"""OpenAI embeddings for ingest + query — batches text into vectors."""
+
 from openai import AsyncOpenAI
 
 from app.core.config import settings
 
 
 class EmbeddingService:
+    """Wraps text-embedding-3-small (or configured model) for chunks and queries."""
+
     def __init__(self) -> None:
         self._client: AsyncOpenAI | None = None
         if settings.openai_api_key:

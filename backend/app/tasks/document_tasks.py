@@ -1,3 +1,10 @@
+"""
+Celery bridge: uploaded document → chunk, embed, store in pgvector.
+
+Triggered by POST /ingest (202). DocumentService does the work; worker updates
+status so Knowledge page polling sees pending → ready.
+"""
+
 import asyncio
 import uuid
 from typing import cast

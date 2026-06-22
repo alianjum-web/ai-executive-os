@@ -11,7 +11,7 @@ import { useRole } from "@/common/hooks/useRole";
 import { useMobileNav } from "@/common/hooks/useMobileNav";
 
 function useNavVisibility() {
-  const { isAdmin } = useRole();
+  const { isAdmin, isLeadership } = useRole();
   const documentUpload = useFeatureFlag("DOCUMENT_UPLOAD_ENABLED");
   const knowledge = useFeatureFlag("KNOWLEDGE_AGENT_ENABLED");
   const project = useFeatureFlag("PROJECT_AGENT_ENABLED");
@@ -28,6 +28,7 @@ function useNavVisibility() {
 
   const visible = (item: NavItem) => {
     if (item.adminOnly && !isAdmin) return false;
+    if (item.leadershipOnly && !isLeadership) return false;
     if (!flagEnabled(item.flag)) return false;
     return true;
   };

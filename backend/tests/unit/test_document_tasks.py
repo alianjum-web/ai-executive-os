@@ -29,7 +29,7 @@ def test_process_document_task_invokes_service(monkeypatch):
         async def __aexit__(self, *args):
             return None
 
-    monkeypatch.setattr(document_tasks, "AsyncSessionLocal", lambda: FakeSession())
+    monkeypatch.setattr(document_tasks, "CeleryAsyncSessionLocal", lambda: FakeSession())
 
     result = process_document_task(str(doc_id))
 

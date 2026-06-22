@@ -1,4 +1,4 @@
-"""Postgres connection helpers — IPv4 + SSL for remote hosts (e.g. Supabase)."""
+"""Supabase-friendly connect_args — SSL, IPv4 fallback, pooler hostname rules."""
 
 from __future__ import annotations
 

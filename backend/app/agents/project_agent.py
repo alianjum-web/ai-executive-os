@@ -1,10 +1,21 @@
+"""
+Project Agent — Slack message → classified tickets in Postgres.
+
+Async path: Celery → run() splits lines, classifies in parallel, writes tickets,
+assigns round-robin, optional Slack DM. LangGraph graph kept for extension; hot
+path bypasses it for speed. Frontend Tasks page reads via GET /tickets.
+"""
+
+import asyncio
 import copy
+import logging
 import uuid
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.feature_flags import flags
 from app.core.slack_events import (
     extract_message_text,
     slack_message_ts_for_line,
@@ -12,9 +23,11 @@ from app.core.slack_events import (
 )
 from app.models.http.slack import SlackEventCallbackPayload, SlackMessageEvent
 from app.services.assignee_service import AssigneeService
-from app.services.intent_service import IntentService
+from app.services.intent_service import IntentClassification, IntentService
 from app.services.notification_service import NotificationService
 from app.services.ticket_service import TicketService
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectState(TypedDict, total=False):
@@ -30,6 +43,8 @@ class ProjectState(TypedDict, total=False):
 
 
 class ProjectAgent:
+    """Orchestrates intent → assignee → ticket row for one Slack event_callback."""
+
     def __init__(self) -> None:
         self.intent_service = IntentService()
         self.assignee_service = AssigneeService()
@@ -102,6 +117,7 @@ class ProjectAgent:
         line_text: str,
         channel_id: str | None,
         message_ts: str | None,
+        classification: IntentClassification,
     ) -> uuid.UUID | None:
         existing = await self.ticket_service.find_by_slack_message(
             db,
@@ -110,6 +126,12 @@ class ProjectAgent:
             slack_message_ts=message_ts,
         )
         if existing:
+            logger.info(
+                "slack_ticket_skip_existing channel=%s ts=%s ticket_id=%s",
+                channel_id,
+                message_ts,
+                existing.id,
+            )
             return existing.id
 
         line_payload: SlackEventCallbackPayload = copy.deepcopy(raw_payload)
@@ -117,33 +139,41 @@ class ProjectAgent:
         line_event["text"] = line_text
         line_payload["event"] = line_event
 
-        parsed = cast(
-            ProjectState,
-            await self.graph.ainvoke(
-                {"org_id": str(org_id), "raw_payload": line_payload}
-            ),
+        priority = max(1, min(5, int(classification.priority)))
+        assignee = await self.assignee_service.assign_round_robin(
+            db, org_id, classification.department
         )
 
-        await self.assignee_service.ensure_default_mappings(db, org_id)
-        assignee = await self.assignee_service.assign_round_robin(
-            db, org_id, parsed.get("department", "support")
+        requires_approval = (
+            flags.TICKET_APPROVAL_ENABLED and flags.JIRA_INTEGRATION_ENABLED
         )
+        approval_status = "pending" if requires_approval else "auto_approved"
 
         ticket = await self.ticket_service.create_ticket_record(
             db,
             org_id=org_id,
             source="slack",
             raw_payload=dict(line_payload),
-            intent=parsed.get("intent", "general"),
-            priority=parsed.get("priority", 3),
-            summary=parsed.get("summary", line_text[:200]),
-            department=parsed.get("department", "support"),
+            intent=classification.intent,
+            priority=priority,
+            summary=classification.summary or line_text[:200],
+            department=classification.department,
             assignee_id=assignee.id if assignee else None,
             slack_channel_id=channel_id,
             slack_message_ts=message_ts,
+            requires_approval=requires_approval,
+            approval_status=approval_status,
         )
 
-        if assignee:
+        logger.info(
+            "slack_ticket_created channel=%s ts=%s ticket_id=%s intent=%s",
+            channel_id,
+            message_ts,
+            ticket.id,
+            classification.intent,
+        )
+
+        if assignee and not requires_approval:
             await self.notifications.notify_slack_dm(assignee, ticket)
 
         return ticket.id
@@ -167,8 +197,23 @@ class ProjectAgent:
         lines = split_message_into_ticket_lines(text)
         multi_line = len(lines) > 1
 
+        logger.info(
+            "slack_ticket_process_start channel=%s ts=%s line_count=%d",
+            channel_id,
+            base_ts,
+            len(lines),
+        )
+
+        classifications = await asyncio.gather(
+            *[self.intent_service.classify(line_text) for line_text in lines]
+        )
+
+        await self.assignee_service.ensure_default_mappings(db, org_id)
+
         first_id: uuid.UUID | None = None
-        for index, line_text in enumerate(lines):
+        for index, (line_text, classification) in enumerate(
+            zip(lines, classifications, strict=True)
+        ):
             line_ts = slack_message_ts_for_line(
                 base_ts or "", index, multi_line=multi_line
             )
@@ -179,8 +224,16 @@ class ProjectAgent:
                 line_text=line_text,
                 channel_id=channel_id,
                 message_ts=line_ts,
+                classification=classification,
             )
             if ticket_id and first_id is None:
                 first_id = ticket_id
+
+        logger.info(
+            "slack_ticket_process_done channel=%s ts=%s ticket_count=%d",
+            channel_id,
+            base_ts,
+            len(lines),
+        )
 
         return first_id

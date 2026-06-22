@@ -1,11 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { isApiUnreachableError } from "@/common/api/fetch";
 import { listTickets, type TicketRecord } from "@/common/api/client";
 import { ticketsPolling } from "@/common/config/polling.config";
 import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
 import { useVisibilityPolling } from "@/common/hooks/useVisibilityPolling";
+import { useAppDispatch, useAppSelector } from "@/common/store/hooks";
+import {
+  clearTicketsFetchError,
+  finishTicketsLoading,
+  setTickets,
+  setTicketsFetchError,
+  setTicketsLoading,
+} from "@/tickets/state/ticketSlice";
 
 function normalizeTickets(data: TicketRecord[]): TicketRecord[] {
   const byId = new Map<string, TicketRecord>();
@@ -25,19 +33,22 @@ function ticketsFingerprint(data: TicketRecord[]): string {
 }
 
 export function useTickets() {
+  const dispatch = useAppDispatch();
   const enabled = useFeatureFlag("PROJECT_AGENT_ENABLED");
-  const [tickets, setTickets] = useState<TicketRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(enabled);
-  const [error, setError] = useState<string | null>(null);
-  const [apiUnreachable, setApiUnreachable] = useState(false);
+  const tickets = useAppSelector((s) => s.tickets.tickets);
+  const isLoading = useAppSelector((s) => s.tickets.isLoading);
+  const error = useAppSelector((s) => s.tickets.error);
+  const apiUnreachable = useAppSelector((s) => s.tickets.apiUnreachable);
   const lastFingerprint = useRef("");
+  const lastChangeAt = useRef(0);
+  const mountedAt = useRef(0);
   const showLoadingOnNextRefresh = useRef(enabled);
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
     if (showLoadingOnNextRefresh.current) {
       showLoadingOnNextRefresh.current = false;
-      setIsLoading(true);
+      dispatch(setTicketsLoading(true));
     }
     try {
       const data = await listTickets();
@@ -45,31 +56,51 @@ export function useTickets() {
       const fp = ticketsFingerprint(normalized);
       if (fp !== lastFingerprint.current) {
         lastFingerprint.current = fp;
-        setTickets(normalized);
+        lastChangeAt.current = Date.now();
+        dispatch(setTickets(normalized));
+      } else {
+        dispatch(clearTicketsFetchError());
+        dispatch(finishTicketsLoading());
       }
-      setError(null);
-      setApiUnreachable(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load tickets");
-      if (isApiUnreachableError(e)) setApiUnreachable(true);
+      dispatch(
+        setTicketsFetchError({
+          error: e instanceof Error ? e.message : "Failed to load tickets",
+          apiUnreachable: isApiUnreachableError(e),
+        })
+      );
     } finally {
-      setIsLoading(false);
+      dispatch(finishTicketsLoading());
     }
-  }, [enabled]);
+  }, [dispatch, enabled]);
 
   useEffect(() => {
     lastFingerprint.current = "";
+    mountedAt.current = Date.now();
     if (enabled) {
       showLoadingOnNextRefresh.current = true;
+      dispatch(setTicketsLoading(true));
     } else {
       showLoadingOnNextRefresh.current = false;
     }
-  }, [enabled]);
+  }, [dispatch, enabled]);
+
+  const getIntervalMs = useCallback(() => {
+    const now = Date.now();
+    const onMountFast =
+      now - mountedAt.current < ticketsPolling.fastDurationMs;
+    const recentChange =
+      lastChangeAt.current > 0 &&
+      now - lastChangeAt.current < ticketsPolling.recentChangeMs;
+    return onMountFast || recentChange
+      ? ticketsPolling.fastIntervalMs
+      : ticketsPolling.intervalMs;
+  }, []);
 
   useVisibilityPolling({
     enabled: enabled && !apiUnreachable,
     onPoll: refresh,
-    ...ticketsPolling,
+    getIntervalMs,
   });
 
   return {

@@ -1,29 +1,54 @@
-import { BookOpen, MessageSquare, Ticket } from "lucide-react";
+import {
+  BookOpen,
+  CircuitBoard,
+  FileSearch,
+  GitBranch,
+  MessageSquare,
+  Ticket,
+} from "lucide-react";
 
 const features = [
+  {
+    icon: GitBranch,
+    title: "Two-agent OS",
+    description:
+      "Ask questions and auto-route work — knowledge Q&A and ticket routing in one platform.",
+  },
   {
     icon: MessageSquare,
     title: "AI knowledge assistant",
     description:
-      "Ask questions grounded in your SOPs and policies with clear citations.",
+      "Citation-grade answers with chunk preview — every response is auditable.",
+  },
+  {
+    icon: FileSearch,
+    title: "Retrieval transparency",
+    description:
+      "See query expansion, grading, and rerank — sources considered are visible in chat.",
   },
   {
     icon: BookOpen,
-    title: "Document library",
+    title: "Department-scoped docs",
     description:
-      "Upload and index PDFs and docs so the whole team shares one source of truth.",
+      "HR vs engineering access controls — mid-size teams keep sensitive docs isolated.",
   },
   {
     icon: Ticket,
-    title: "Smart ticket routing",
+    title: "Workload-aware routing",
     description:
-      "Route requests from Slack and email to the right owner automatically.",
+      "Smarter than round-robin — tickets land on the teammate with the lightest load.",
+  },
+  {
+    icon: CircuitBoard,
+    title: "Resilient AI stack",
+    description:
+      "Circuit breaker and heuristics fallback keep answers flowing when providers rate-limit.",
   },
 ] as const;
 
 export function WelcomeFeatureGrid() {
   return (
-    <section className="mt-16 grid gap-6 sm:grid-cols-3">
+    <section className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {features.map((feature) => {
         const Icon = feature.icon;
         return (

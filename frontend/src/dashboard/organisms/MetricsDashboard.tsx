@@ -1,8 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { analyticsPolling } from "@/common/config/polling.config";
-import { useVisibilityPolling } from "@/common/hooks/useVisibilityPolling";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -12,9 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { isApiUnreachableError } from "@/common/api/fetch";
-import { fetchAnalytics, type AnalyticsDashboard } from "@/common/api/client";
-import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
+import { useAnalytics } from "@/dashboard/hooks/useAnalytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/common/atoms/ui/card";
 import { Skeleton } from "@/common/atoms/ui/skeleton";
 import { ErrorState } from "@/common/molecules/ErrorState";
@@ -45,47 +41,13 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 }
 
 export function MetricsDashboard() {
-  const enabled = useFeatureFlag("ANALYTICS_DASHBOARD_ENABLED");
-  const [metrics, setMetrics] = useState<AnalyticsDashboard | null>(null);
-  const [isLoading, setIsLoading] = useState(enabled);
-  const [error, setError] = useState<string | null>(null);
-  const [apiUnreachable, setApiUnreachable] = useState(false);
+  const { enabled, metrics, isLoading, error, refresh } = useAnalytics();
   const [chartColors, setChartColors] = useState({
     tick: "#94a3b8",
     grid: "#243047",
     bar: "#4f8cff",
     tooltipBg: "#1a2336",
     tooltipFg: "#f8fafc",
-  });
-
-  const showLoadingOnNextPoll = useRef(enabled);
-
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    if (showLoadingOnNextPoll.current) {
-      showLoadingOnNextPoll.current = false;
-      setIsLoading(true);
-    }
-    try {
-      setMetrics(await fetchAnalytics());
-      setError(null);
-      setApiUnreachable(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load metrics");
-      if (isApiUnreachableError(e)) setApiUnreachable(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [enabled]);
-
-  useEffect(() => {
-    if (enabled) showLoadingOnNextPoll.current = true;
-  }, [enabled]);
-
-  useVisibilityPolling({
-    enabled: enabled && !apiUnreachable,
-    onPoll: load,
-    ...analyticsPolling,
   });
 
   useEffect(() => {
@@ -109,7 +71,7 @@ export function MetricsDashboard() {
 
   if (!enabled) return null;
   if (error) {
-    return <ErrorState message={error} onRetry={load} />;
+    return <ErrorState message={error} onRetry={refresh} />;
   }
   if (isLoading && !metrics) {
     return (

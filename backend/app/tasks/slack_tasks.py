@@ -1,3 +1,10 @@
+"""
+Celery bridge: Slack webhook payload → Q&A or ProjectAgent in a worker process.
+
+FastAPI only enqueues; all LLM classify + DB writes happen here so Slack gets
+200 immediately. Uses CeleryAsyncSessionLocal (NullPool) per task.
+"""
+
 import asyncio
 import uuid
 from typing import cast
@@ -6,8 +13,11 @@ from celery.app.task import Task
 
 from app.core.config import settings
 from app.core.database import CeleryAsyncSessionLocal
+from app.core.feature_flags import flags
+from app.core.slack_events import slack_message_mode
 from app.agents.project_agent import ProjectAgent
-from app.models.http.slack import SlackEventCallbackPayload
+from app.models.http.slack import SlackEventCallbackPayload, SlackMessageEvent
+from app.services.slack_qa_service import SlackQaService
 from app.tasks.celery_app import celery_app
 
 
@@ -26,16 +36,28 @@ def process_slack_event_task(
                 resolved_org = uuid.UUID(settings.default_org_id)
             if not resolved_org:
                 return "skipped:no_org"
+
+            event: SlackMessageEvent = payload.get("event") or payload  # type: ignore[assignment]
+
+            mode = slack_message_mode(event)
+
+            if mode == "qa" and flags.SLACK_QA_ENABLED:
+                qa = SlackQaService()
+                ok = await qa.answer_in_channel(db, resolved_org, payload)
+                return "slack_qa:ok" if ok else "slack_qa:failed"
+
+            if not flags.PROJECT_AGENT_ENABLED:
+                return "skipped:project_agent_disabled"
+
             agent = ProjectAgent()
             ticket_id = await agent.run(db, resolved_org, payload)
             if ticket_id:
-                return str(ticket_id)
+                return f"slack_ticket:{ticket_id}"
             return "skipped"
 
     return _run_async(_process())
 
 
-# Typed Celery handle for pyright (decorator erases Task methods on the function).
 process_slack_event: Task = cast(Task, process_slack_event_task)
 
 

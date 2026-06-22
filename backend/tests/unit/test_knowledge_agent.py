@@ -36,8 +36,11 @@ async def test_retrieve_passes_zero_min_score_for_hash_embeddings(monkeypatch):
     async def _fake_embed(_text: str) -> list[float]:
         return [0.0] * settings.embedding_dimensions
 
-    async def _fake_search(_db, embedding, org_id=None, top_k=5, min_score=0.2):
+    async def _fake_search(
+        _db, embedding, org_id=None, top_k=5, min_score=0.2, access_filter=None
+    ):
         captured["min_score"] = min_score
+        captured["access_filter"] = access_filter
         return []
 
     monkeypatch.setattr(agent.embedder, "embed", _fake_embed)

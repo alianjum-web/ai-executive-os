@@ -19,7 +19,9 @@ import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
 export function LoginScreen() {
   const router = useRouter();
   const authEnabled = useFeatureFlag("BASIC_AUTH_ENABLED");
+  const ssoEnabled = useFeatureFlag("SSO_ENABLED");
   const [formError, setFormError] = useState<string | null>(null);
+  const [ssoBusy, setSsoBusy] = useState<string | null>(null);
 
   const {
     register,
@@ -30,6 +32,18 @@ export function LoginScreen() {
     defaultValues: { email: "", password: "" },
     mode: "onBlur",
   });
+
+  const handleOAuth = async (provider: "google" | "azure") => {
+    setFormError(null);
+    setSsoBusy(provider);
+    try {
+      const { error } = await authService.signInWithOAuth(provider);
+      if (error) throw error;
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "SSO sign-in failed");
+      setSsoBusy(null);
+    }
+  };
 
   const onSubmit = handleSubmit(async (data) => {
     setFormError(null);
@@ -98,6 +112,33 @@ export function LoginScreen() {
             >
               Sign in
             </Button>
+            {ssoEnabled ? (
+              <div className="space-y-3 border-t border-border pt-4">
+                <p className="text-center text-xs text-muted-foreground">
+                  Or continue with SSO
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    isLoading={ssoBusy === "google"}
+                    disabled={!!ssoBusy}
+                    onClick={() => void handleOAuth("google")}
+                  >
+                    Google
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    isLoading={ssoBusy === "azure"}
+                    disabled={!!ssoBusy}
+                    onClick={() => void handleOAuth("azure")}
+                  >
+                    Microsoft
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </form>
           <p className="mt-6 text-center text-sm text-muted-foreground">
             New here?{" "}

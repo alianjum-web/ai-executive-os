@@ -1,3 +1,5 @@
+"""Pre-flight env checks — hard-fail in production if secrets or LLM key missing."""
+
 import logging
 import sys
 

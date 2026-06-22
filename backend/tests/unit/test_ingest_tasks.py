@@ -39,7 +39,7 @@ async def test_ingest_queues_process_document_task():
                 return_value=fake_doc,
             ) as save_mock,
             patch(
-                "app.api.v1.routers.ingest.process_document_task.delay",
+                "app.api.v1.routers.ingest.process_document.delay",
             ) as delay_mock,
             patch(
                 "app.api.v1.routers.ingest.flags",

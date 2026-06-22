@@ -6,6 +6,11 @@ const statusMap: Record<string, "default" | "success" | "warning" | "destructive
   processing: "ai",
   ready: "success",
   error: "destructive",
+  pending_approval: "warning",
+  open: "default",
+  assigned: "ai",
+  approved: "success",
+  rejected: "destructive",
 };
 
 export function Badge({ status }: { status: string }) {

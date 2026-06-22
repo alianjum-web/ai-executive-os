@@ -1,9 +1,29 @@
+"""
+FastAPI app entry — mounts v1 routers and CORS.
+
+Two product flows share this process: Knowledge (ingest → query) and Tasks
+(webhook → tickets). Background work is always delegated to Celery workers.
+"""
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routers import analytics, health, ingest, profile, query, tickets, webhooks
+from app.api.v1.routers import (
+    analytics,
+    connectors,
+    demo,
+    evaluation,
+    health,
+    ingest,
+    profile,
+    query,
+    settings as settings_router,
+    tickets,
+    webhooks,
+)
+from app.core.feature_registry import get_public_config
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 
@@ -63,3 +83,12 @@ app.include_router(query.router, prefix=api_prefix, tags=["knowledge"])
 app.include_router(analytics.router, prefix=api_prefix, tags=["analytics"])
 app.include_router(webhooks.router, prefix=api_prefix, tags=["webhooks"])
 app.include_router(tickets.router, prefix=api_prefix, tags=["tickets"])
+app.include_router(evaluation.router, prefix=api_prefix, tags=["evaluation"])
+app.include_router(connectors.router, prefix=api_prefix, tags=["connectors"])
+app.include_router(settings_router.router, prefix=api_prefix, tags=["settings"])
+app.include_router(demo.router, prefix=api_prefix, tags=["demo"])
+
+
+@app.get(f"{api_prefix}/config/features")
+async def public_features_config():
+    return get_public_config()

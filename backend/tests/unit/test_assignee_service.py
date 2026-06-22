@@ -8,7 +8,11 @@ from app.services.assignee_service import AssigneeService
 
 
 @pytest.mark.asyncio
-async def test_round_robin_cycles_users():
+async def test_round_robin_cycles_users(monkeypatch):
+    class _Flags:
+        WORKLOAD_BALANCING_ENABLED = False
+
+    monkeypatch.setattr("app.services.assignee_service.flags", _Flags())
     org_id = uuid.uuid4()
     user_a = uuid.uuid4()
     user_b = uuid.uuid4()

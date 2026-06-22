@@ -15,7 +15,6 @@ PACKAGES = [
     "pydantic_settings",
     "sqlalchemy",
     "asyncpg",
-    "alembic",
     "slowapi",
     "sentry_sdk",
     "openai",

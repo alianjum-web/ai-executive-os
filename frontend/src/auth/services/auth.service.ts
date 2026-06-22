@@ -38,6 +38,20 @@ export const authService = {
     });
   },
 
+  async signInWithOAuth(provider: "google" | "azure") {
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    return supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo },
+    });
+  },
+
+  async updateUserMetadata(metadata: Record<string, unknown>) {
+    const supabase = createClient();
+    return supabase.auth.updateUser({ data: metadata });
+  },
+
   async signOut() {
     const supabase = createClient();
     return supabase.auth.signOut();

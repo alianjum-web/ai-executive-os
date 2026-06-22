@@ -63,6 +63,11 @@ export function useQueryStream() {
         answer: "",
         citations: [],
         latency_ms: null,
+        confidence_score: null,
+        escalated: false,
+        escalation_ticket_id: null,
+        query_log_id: null,
+        retrieval_trace: null,
       };
 
       try {
@@ -93,6 +98,11 @@ export function useQueryStream() {
                 answer: event.answer ?? accumulated,
                 citations: event.citations ?? [],
                 latency_ms: event.latency_ms ?? null,
+                confidence_score: event.confidence_score ?? null,
+                escalated: event.escalated ?? false,
+                escalation_ticket_id: event.escalation_ticket_id ?? null,
+                query_log_id: event.query_log_id ?? null,
+                retrieval_trace: event.retrieval_trace ?? null,
               };
             }
           }

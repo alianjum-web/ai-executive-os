@@ -10,9 +10,10 @@
     "deps:docker:all": "docker compose -f ../docker/docker-compose.yml up -d postgres redis",
 
     "db:check": "ENV_FILE=.env.dev .venv/bin/python scripts/check_services.py",
-    "db:migrate": "ENV_FILE=.env.dev .venv/bin/alembic upgrade head",
+    "db:migrate": "bash scripts/db_push.sh .env.dev",
+    "db:migration:list": "bash -c 'set -a && source .env.dev && set +a && supabase migration list --db-url \"${DATABASE_URL/postgresql+asyncpg/postgresql}\"'",
     "db:check:prod": "ENV_FILE=.env.production .venv/bin/python scripts/check_services.py",
-    "db:migrate:prod": "ENV_FILE=.env.production .venv/bin/alembic upgrade head",
+    "db:migrate:prod": "bash scripts/db_push.sh .env.production",
 
     "check:env": "ENV_FILE=.env.dev .venv/bin/python scripts/validate_env.py",
     "check:prod": "ENV_FILE=.env.production .venv/bin/python scripts/validate_env.py --production",
@@ -25,7 +26,10 @@
     "check:celery": ".venv/bin/python scripts/check_celery_tasks.py",
     "doc:reprocess": "ENV_FILE=.env.dev .venv/bin/python scripts/reprocess_document.py",
     "doc:reprocess:prod": "ENV_FILE=.env.production .venv/bin/python scripts/reprocess_document.py",
+    "demo:seed": "ENV_FILE=.env.dev .venv/bin/python scripts/seed_demo.py",
+    "demo:seed:prod": "ENV_FILE=.env.production .venv/bin/python scripts/seed_demo.py",
     "test:unit": ".venv/bin/python -m pytest tests/unit/ -q",
+    "test:ci": ".venv/bin/python -m pytest tests/unit/ -q --tb=short",
     "typecheck": ".venv/bin/python -m pyright app",
 
     "predev": "npm run check:celery && npm run db:check && npm run db:migrate",

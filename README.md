@@ -307,7 +307,7 @@ More: [`backend/README.md`](backend/README.md)
 ```bash
 cd backend
 source .venv/bin/activate
-alembic upgrade head
+cd backend && npm run db:migrate
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 # second terminal:
 celery -A app.tasks.celery_app.celery_app worker --loglevel=info
@@ -404,7 +404,8 @@ cd frontend && npm run test:e2e   # optional live stack: E2E_RUN_LIVE=1
 | [`docs/ENV_QUICK_START.md`](docs/ENV_QUICK_START.md) | Env templates + full-app start |
 | [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md) | All env vars |
 | [`docs/FEATURE_FLAGS.md`](docs/FEATURE_FLAGS.md) | Feature flags |
-| [`frontend/docs/PROJECT_MASTER.md`](frontend/docs/PROJECT_MASTER.md) | Frontend-specific notes |
+| [`docs/CI_CD.md`](docs/CI_CD.md) | **GitHub Actions CI/CD setup** |
+| [`docs/PRODUCT_STRATEGY_AND_ROADMAP.md`](docs/PRODUCT_STRATEGY_AND_ROADMAP.md) | **Achieved vs gaps, market comparison, RBAC, roadmap** |
 
 ---
 

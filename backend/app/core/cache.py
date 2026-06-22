@@ -1,3 +1,10 @@
+"""
+Redis cache for Knowledge Agent answers (RAG path only).
+
+Keyed by query + org_id; gated by RAG_CACHE_ENABLED. Separate from Slack dedupe
+keys and from LlmClassifyCircuit — reduces repeat LLM cost on identical questions.
+"""
+
 import hashlib
 import json
 import logging
@@ -12,6 +19,8 @@ _CACHE_TTL_SECONDS = 3600
 
 
 class QueryCacheService:
+    """Read-through cache for /query responses; safe no-op when Redis is unavailable."""
+
     def __init__(self) -> None:
         self._redis = None
 

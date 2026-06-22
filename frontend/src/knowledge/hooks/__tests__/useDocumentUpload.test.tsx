@@ -1,4 +1,5 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act } from "@testing-library/react";
+import { renderHookWithStore } from "@/common/store/test-utils";
 import { useDocumentUpload } from "../useDocumentUpload";
 
 jest.mock("@/common/api/client", () => ({
@@ -26,7 +27,7 @@ describe("useDocumentUpload", () => {
       },
     ]);
 
-    const { result } = renderHook(() => useDocumentUpload());
+    const { result } = renderHookWithStore(() => useDocumentUpload());
 
     await act(async () => {
       await result.current.refresh();
@@ -43,7 +44,7 @@ describe("useDocumentUpload", () => {
       new Error("Cannot reach the API. Start the backend (npm run dev or npm run prod in backend/).")
     );
 
-    const { result } = renderHook(() => useDocumentUpload());
+    const { result } = renderHookWithStore(() => useDocumentUpload());
 
     await act(async () => {
       await result.current.refresh();

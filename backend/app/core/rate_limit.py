@@ -1,3 +1,10 @@
+"""
+Per-tenant HTTP rate limits (slowapi).
+
+Applied on expensive routes (query stream, ingest). Keys by user/org header in dev
+or JWT-derived identity — protects LLM and embedding cost from abuse.
+"""
+
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address

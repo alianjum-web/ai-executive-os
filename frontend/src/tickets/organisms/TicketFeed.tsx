@@ -11,7 +11,7 @@ import { EmptyState } from "@/common/molecules/EmptyState";
 
 export function TicketFeed() {
   const enabled = useFeatureFlag("PROJECT_AGENT_ENABLED");
-  const { tickets, isLoading, error } = useTickets();
+  const { tickets, isLoading, error, refresh } = useTickets();
 
   if (!enabled) {
     return (
@@ -69,7 +69,11 @@ export function TicketFeed() {
           </thead>
           <tbody>
             {tickets.map((ticket) => (
-              <TicketRow key={ticket.id} ticket={ticket} />
+              <TicketRow
+                key={ticket.id}
+                ticket={ticket}
+                onUpdated={() => void refresh()}
+              />
             ))}
           </tbody>
         </table>

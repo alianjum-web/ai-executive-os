@@ -1,4 +1,9 @@
-"""Build chat/grading clients from features.json ai_provider + ai_models."""
+"""
+Which LLM provider is active and whether its API key is set.
+
+features.json picks openai | gemini | groq | anthropic; startup validation fails
+in production if the active provider has no key. Chat + ticket classify both use this.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import { Badge } from "@/common/atoms/Badge";
-import type { TicketRecord } from "@/common/api/client";
+import { Button } from "@/common/atoms/ui/button";
+import { approveTicket, rejectTicket, type TicketRecord } from "@/common/api/client";
+import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
+import { useRole } from "@/common/hooks/useRole";
 import { cn } from "@/common/lib/utils";
 
 const priorityColors: Record<number, string> = {
@@ -10,11 +16,46 @@ const priorityColors: Record<number, string> = {
   5: "bg-destructive/15 text-destructive",
 };
 
-export function TicketRow({ ticket }: { ticket: TicketRecord }) {
+export function TicketRow({
+  ticket,
+  onUpdated,
+}: {
+  ticket: TicketRecord;
+  onUpdated?: () => void;
+}) {
+  const approvalEnabled = useFeatureFlag("TICKET_APPROVAL_ENABLED");
+  const { isLeadership } = useRole();
+  const [busy, setBusy] = useState(false);
   const priorityClass =
     ticket.priority != null
       ? priorityColors[ticket.priority] ?? "bg-muted text-muted-foreground"
       : "bg-muted text-muted-foreground";
+
+  const pending =
+    ticket.requires_approval &&
+    (ticket.approval_status === "pending" ||
+      ticket.approval_status === "pending_approval" ||
+      ticket.status === "pending_approval");
+
+  const handleApprove = async () => {
+    setBusy(true);
+    try {
+      await approveTicket(ticket.id);
+      onUpdated?.();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setBusy(true);
+    try {
+      await rejectTicket(ticket.id);
+      onUpdated?.();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <tr className="border-t border-border-subtle transition-colors hover:bg-muted/40">
@@ -44,7 +85,25 @@ export function TicketRow({ ticket }: { ticket: TicketRecord }) {
         {ticket.assignee_email ?? "Unassigned"}
       </td>
       <td className="px-4 py-3.5 text-xs text-muted-foreground">
-        {new Date(ticket.created_at).toLocaleString()}
+        <div>{new Date(ticket.created_at).toLocaleString()}</div>
+        {ticket.external_ticket_id ? (
+          <div className="mt-1 text-accent-blue">Jira: {ticket.external_ticket_id}</div>
+        ) : null}
+        {approvalEnabled && isLeadership && pending ? (
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" disabled={busy} onClick={() => void handleApprove()}>
+              Approve
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => void handleReject()}
+            >
+              Reject
+            </Button>
+          </div>
+        ) : null}
       </td>
     </tr>
   );

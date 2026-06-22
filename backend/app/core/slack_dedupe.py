@@ -1,4 +1,10 @@
-"""Redis-backed idempotency for Slack event_callback deliveries."""
+"""
+First line of defense against duplicate Slack tickets.
+
+Slack retries the same event from multiple IPs; SET NX in Redis before enqueueing
+Celery ensures only one process_slack_event task per event_id (or channel+ts).
+DB unique index is the second line — see ticket_service + migration 005.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +19,8 @@ _SLACK_DEDUPE_TTL_SECONDS = 60 * 60 * 24
 
 
 class SlackEventDedupe:
+    """Redis SET NX gate; claim() True = process this delivery, False = Slack retry."""
+
     def __init__(self) -> None:
         self._redis = None
 

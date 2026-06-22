@@ -8,12 +8,12 @@ export function RoleGuard({
   allowedRoles,
   children,
 }: {
-  allowedRoles: ("admin" | "employee")[];
+  allowedRoles: ("admin" | "manager" | "employee")[];
   children: React.ReactNode;
 }) {
   const router = useRouter();
   const { role } = useRole();
-  const effectiveRole = (role ?? "employee") as "admin" | "employee";
+  const effectiveRole = (role ?? "employee") as "admin" | "manager" | "employee";
   const allowed = allowedRoles.includes(effectiveRole);
 
   useEffect(() => {

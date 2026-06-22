@@ -1,7 +1,18 @@
+"""
+Slack ticket classification — intent, priority, department, summary.
+
+LLM when circuit closed; keyword heuristics when open or on 429. Used only by
+ProjectAgent, not by KnowledgeAgent chat.
+"""
+
 import json
+import logging
 import re
 
+from app.core.llm_classify_circuit import LlmClassifyCircuit
 from app.services.llm_service import LLMService
+
+logger = logging.getLogger(__name__)
 
 INTENT_CATEGORIES = (
     "bug_report",
@@ -29,25 +40,27 @@ class IntentClassification:
 
 
 class IntentService:
+    """One classify() per ticket line; consults LlmClassifyCircuit before calling LLM."""
+
     def __init__(self) -> None:
         self.llm = LLMService()
 
     async def classify(self, message_text: str) -> IntentClassification:
-        if self.llm.has_client:
-            raw = await self.llm.generate_answer(
-                "You classify support tickets. Reply with JSON only.",
-                (
-                    f"Classify this Slack message:\n{message_text}\n\n"
-                    "Return JSON with keys: intent (one of "
-                    f"{', '.join(INTENT_CATEGORIES)}), priority (1-5 integer), "
-                    f"summary (one sentence), department (one of {', '.join(DEPARTMENTS)})."
-                ),
-            )
-            parsed = self._parse_json(raw)
+        if self.llm.has_client and not LlmClassifyCircuit.is_open():
+            raw = await self.llm.classify_ticket_json(message_text)
+            parsed = self._parse_json(raw) if raw else None
             if parsed:
-                return self._from_dict(parsed)
+                result = self._from_dict(parsed)
+                logger.debug("intent_classified source=llm intent=%s", result.intent)
+                return result
 
-        return self._heuristic_classify(message_text)
+        result = self._heuristic_classify(message_text)
+        logger.debug(
+            "intent_classified source=heuristic intent=%s circuit_open=%s",
+            result.intent,
+            LlmClassifyCircuit.is_open(),
+        )
+        return result
 
     def _parse_json(self, raw: str) -> dict | None:
         try:

@@ -1,8 +1,12 @@
+"""Outbound alerts after ticket creation — Slack DM to assignee when configured."""
+
 from app.core.config import settings
 from app.models.db.tables import Ticket, User
 
 
 class NotificationService:
+    """Optional post-ticket Slack DM; skipped if bot token or slack_user_id missing."""
+
     async def notify_slack_dm(
         self,
         assignee: User | None,

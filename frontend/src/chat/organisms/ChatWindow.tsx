@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { MessageSquare } from "lucide-react";
 import { Button } from "@/common/atoms/ui/button";
 import { Input } from "@/common/atoms/ui/input";
@@ -15,10 +15,19 @@ import { EmptyState } from "@/common/molecules/EmptyState";
 import { cn } from "@/common/lib/utils";
 
 export function ChatWindow() {
-  const { messages, isStreaming, sendMessage } = useChat();
-  const [input, setInput] = useState("");
-  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const {
+    messages,
+    isStreaming,
+    input,
+    selectedCitation,
+    sourcesPanelOpen,
+    setInput,
+    setSelectedCitation,
+    setSourcesPanelOpen,
+    clearComposer,
+    sendMessage,
+    escalateMessage,
+  } = useChat();
 
   const activeCitations = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -30,29 +39,31 @@ export function ChatWindow() {
     return [];
   }, [messages]);
 
-  const handleSelectCitation = useCallback((c: Citation) => {
-    setSelectedCitation(c);
-    setPanelOpen(true);
-  }, []);
+  const handleSelectCitation = useCallback(
+    (c: Citation) => {
+      setSelectedCitation(c);
+      setSourcesPanelOpen(true);
+    },
+    [setSelectedCitation, setSourcesPanelOpen]
+  );
 
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isStreaming) return;
-    setInput("");
-    setSelectedCitation(null);
+    clearComposer();
     await sendMessage(text);
   };
 
-  const showPanel = panelOpen && activeCitations.length > 0;
+  const showPanel = sourcesPanelOpen && activeCitations.length > 0;
 
   return (
     <div
       className={cn(
-        "flex min-h-[min(640px,calc(100vh-12rem))] flex-col overflow-hidden rounded-xl border border-border bg-card lg:flex-row"
+        "flex h-[calc(100vh-9.5rem)] min-h-[480px] max-h-[calc(100vh-9.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card lg:flex-row"
       )}
     >
-      <Card className="flex min-h-0 min-w-0 flex-1 flex-col rounded-none border-0 shadow-none">
-        <CardHeader className="border-b border-border pb-4">
+      <Card className="flex h-full min-h-0 min-w-0 flex-1 flex-col rounded-none border-0 shadow-none">
+        <CardHeader className="shrink-0 border-b border-border pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
             <MessageSquare className="h-4 w-4 text-accent-blue" aria-hidden />
             Knowledge assistant
@@ -62,7 +73,7 @@ export function ChatWindow() {
           </p>
         </CardHeader>
 
-        <CardContent className="flex flex-1 flex-col gap-4 overflow-y-auto py-4">
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain py-4">
           {isStreaming ? (
             <AIProcessingBanner message="Generating a grounded response…" />
           ) : null}
@@ -76,25 +87,49 @@ export function ChatWindow() {
             />
           ) : (
             <div className="space-y-4">
-              {messages.map((m) => (
-                <ChatBubble
-                  key={m.id}
-                  role={m.role}
-                  content={m.content}
-                  citations={m.citations}
-                  selectedCitationKey={
-                    selectedCitation ? citationKey(selectedCitation) : null
-                  }
-                  onSelectCitation={
-                    m.role === "assistant" ? handleSelectCitation : undefined
-                  }
-                />
-              ))}
+              {messages.map((m, index) => {
+                const priorUser =
+                  m.role === "assistant"
+                    ? [...messages]
+                        .slice(0, index)
+                        .reverse()
+                        .find((x) => x.role === "user")
+                    : undefined;
+                return (
+                  <ChatBubble
+                    key={m.id}
+                    role={m.role}
+                    content={m.content}
+                    citations={m.citations}
+                    confidenceScore={m.confidence_score}
+                    escalated={m.escalated}
+                    queryLogId={m.query_log_id}
+                    retrievalTrace={m.retrieval_trace}
+                    userQuery={priorUser?.content}
+                    selectedCitationKey={
+                      selectedCitation ? citationKey(selectedCitation) : null
+                    }
+                    onSelectCitation={
+                      m.role === "assistant" ? handleSelectCitation : undefined
+                    }
+                    onEscalate={
+                      m.role === "assistant" && priorUser
+                        ? () =>
+                            void escalateMessage(
+                              m.id,
+                              priorUser.content,
+                              m.confidence_score
+                            )
+                        : undefined
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </CardContent>
 
-        <CardFooter className="flex gap-3 border-t border-border bg-muted/30 p-4">
+        <CardFooter className="shrink-0 flex gap-3 border-t border-border bg-muted/30 p-4">
           <Input
             className="flex-1"
             placeholder="Ask about company policies…"
@@ -114,13 +149,16 @@ export function ChatWindow() {
           citations={activeCitations}
           selected={selectedCitation}
           onSelect={handleSelectCitation}
-          onClose={() => setPanelOpen(false)}
+          onClose={() => {
+            setSourcesPanelOpen(false);
+            setSelectedCitation(null);
+          }}
           className="w-full lg:w-[min(420px,38vw)]"
         />
       ) : activeCitations.length > 0 ? (
         <button
           type="button"
-          onClick={() => setPanelOpen(true)}
+          onClick={() => setSourcesPanelOpen(true)}
           className="border-t border-border px-4 py-2 text-xs font-medium text-accent-ai hover:bg-muted/50 lg:border-l lg:border-t-0 lg:writing-mode-vertical"
         >
           Show {activeCitations.length} sources

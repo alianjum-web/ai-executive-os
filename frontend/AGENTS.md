@@ -1,6 +1,6 @@
 # Agent Instructions
 
-**Before coding:** Read [docs/PROJECT_MASTER.md](./docs/PROJECT_MASTER.md) for product vision, architecture, sprint status, feature flags, and conventions.
+**Before coding:** Read [docs/PROJECT_MASTER.md](../docs/PROJECT_MASTER.md) (engineering) and [docs/PRODUCT_STRATEGY_AND_ROADMAP.md](../docs/PRODUCT_STRATEGY_AND_ROADMAP.md) (what to build next, RBAC, market position).
 
 **State management:** Use **Redux Toolkit** behind feature hooks (`useSidebar`, `useChat`, etc.). Components must never import `store/` or use `useSelector`/`useDispatch` directly.
 

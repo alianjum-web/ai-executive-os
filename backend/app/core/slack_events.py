@@ -1,4 +1,9 @@
-"""Slack Events API helpers for webhook ingestion."""
+"""
+Pure parsing rules for Slack → ticket pipeline (no I/O).
+
+webhooks.py filters with should_process_slack_message; ProjectAgent splits multi-line
+posts here. Keeps Slack payload shape out of agents and services.
+"""
 
 from __future__ import annotations
 
@@ -75,6 +80,78 @@ def slack_message_ts_for_line(base_ts: str, line_index: int, *, multi_line: bool
     if not multi_line:
         return base_ts
     return f"{base_ts}#{line_index}"
+
+
+_QUESTION_PREFIXES = (
+    "how ",
+    "what ",
+    "why ",
+    "when ",
+    "who ",
+    "where ",
+    "can ",
+    "is ",
+    "does ",
+    "do ",
+    "could ",
+    "should ",
+)
+
+
+_TICKET_PREFIXES = (
+    "!ticket",
+    "!route",
+    "urgent:",
+    "action:",
+    "please fix",
+    "please assign",
+    "create ticket",
+    "need help with",
+)
+
+
+def is_slack_ticket_message(event: SlackMessageEvent) -> bool:
+    """True when the message should route to Project Agent (ticket creation)."""
+    text = extract_message_text(event).strip().lower()
+    if not text:
+        return False
+    if text.startswith("!ticket") or text.startswith("!route"):
+        return True
+    for phrase in _TICKET_PREFIXES:
+        if phrase.startswith("!"):
+            continue
+        if phrase in text:
+            return True
+    # Statements without question marks that look like work requests
+    if "?" not in text and any(
+        kw in text
+        for kw in ("broken", "not working", "down", "outage", "asap", "escalate")
+    ):
+        return True
+    return False
+
+
+def is_slack_qa_message(event: SlackMessageEvent) -> bool:
+    """True when the message looks like a knowledge question (in-channel Q&A)."""
+    if is_slack_ticket_message(event):
+        return False
+    if event.get("subtype") == "app_mention":
+        return True
+    text = extract_message_text(event).strip().lower()
+    if not text:
+        return False
+    if text.endswith("?"):
+        return True
+    return any(text.startswith(prefix) for prefix in _QUESTION_PREFIXES)
+
+
+def slack_message_mode(event: SlackMessageEvent) -> str:
+    """Dual-mode routing: 'qa' for knowledge answers, 'ticket' for project routing."""
+    if is_slack_ticket_message(event):
+        return "ticket"
+    if is_slack_qa_message(event):
+        return "qa"
+    return "ticket"
 
 
 def should_process_slack_message(event: SlackMessageEvent) -> bool:

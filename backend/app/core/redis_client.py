@@ -1,4 +1,9 @@
-"""Shared Redis async client factory (Upstash / rediss:// compatible)."""
+"""
+Redis connection helper for FastAPI async code (not Celery).
+
+Celery uses redis_url_for_celery with SSL in the URL; redis-py needs SSL as a kwarg.
+Used by slack_dedupe and RAG query cache — same Upstash instance as the Celery broker.
+"""
 
 from __future__ import annotations
 

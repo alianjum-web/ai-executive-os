@@ -1,3 +1,5 @@
+"""Fernet encrypt/decrypt for stored secrets — requires ENCRYPTION_KEY in production."""
+
 import base64
 import hashlib
 

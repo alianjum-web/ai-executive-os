@@ -26,7 +26,7 @@ def as_ticket_source(value: str) -> TicketSource:
 
 
 def as_ticket_status(value: str) -> TicketStatus:
-    if value in ("open", "in_progress", "resolved", "closed"):
+    if value in ("open", "in_progress", "resolved", "closed", "pending_approval"):
         return cast(TicketStatus, value)
     return "open"
 
@@ -40,4 +40,6 @@ def as_ai_provider_id(value: str) -> AiProviderId:
 def as_user_role(value: str) -> UserRole:
     if value == "admin":
         return "admin"
+    if value == "manager":
+        return "manager"
     return "employee"

@@ -12,8 +12,18 @@ export function AttentionPanel() {
   const ticketsEnabled = useFeatureFlag("PROJECT_AGENT_ENABLED");
   const { tickets, isLoading, error } = useTickets();
 
+  const approvalEnabled = useFeatureFlag("TICKET_APPROVAL_ENABLED");
+
   const openTickets = tickets.filter(
     (t) => t.status === "open" || t.status === "in_progress"
+  ).length;
+
+  const pendingApprovals = tickets.filter(
+    (t) =>
+      t.requires_approval &&
+      (t.approval_status === "pending" ||
+        t.approval_status === "pending_approval" ||
+        t.status === "pending_approval")
   ).length;
 
   return (
@@ -58,6 +68,20 @@ export function AttentionPanel() {
                 </Link>
               </Button>
             </div>
+            {approvalEnabled && pendingApprovals > 0 ? (
+              <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+                <p className="text-sm font-medium text-foreground">
+                  {pendingApprovals} ticket{pendingApprovals === 1 ? "" : "s"}{" "}
+                  awaiting approval
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Review before Jira sync and assignee notification
+                </p>
+                <Button variant="secondary" size="sm" className="mt-3" asChild>
+                  <Link href="/tickets">Review queue</Link>
+                </Button>
+              </div>
+            ) : null}
             {tickets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No tickets yet — you&apos;re all caught up.

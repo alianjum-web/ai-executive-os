@@ -1,49 +1,68 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { documentsPolling } from "@/common/config/polling.config";
 import { useVisibilityPolling } from "@/common/hooks/useVisibilityPolling";
 import { isApiUnreachableError } from "@/common/api/fetch";
 import { listDocuments, uploadDocument } from "@/common/api/client";
 import { isDocumentProcessing, type DocumentRecord } from "@/common/types";
+import { useAppDispatch, useAppSelector } from "@/common/store/hooks";
+import {
+  clearDocumentsFetchError,
+  finishDocumentsLoading,
+  setDocuments,
+  setDocumentsFetchError,
+  setDocumentsLoading,
+  setUploadError,
+  setUploading,
+} from "@/knowledge/state/knowledgeSlice";
 
 function documentsFingerprint(docs: DocumentRecord[]): string {
   return docs.map((d) => `${d.id}:${d.status}`).join("|");
 }
 
 export function useDocumentUpload() {
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [apiUnreachable, setApiUnreachable] = useState(false);
+  const dispatch = useAppDispatch();
+  const documents = useAppSelector((s) => s.knowledge.documents);
+  const isUploading = useAppSelector((s) => s.knowledge.isUploading);
+  const isLoading = useAppSelector((s) => s.knowledge.isLoading);
+  const error = useAppSelector((s) => s.knowledge.error);
+  const apiUnreachable = useAppSelector((s) => s.knowledge.apiUnreachable);
   const lastFingerprint = useRef("");
   const showLoadingOnNextRefresh = useRef(true);
 
-  const refresh = useCallback(async (options?: { background?: boolean }) => {
-    const background = options?.background ?? false;
-    if (!background && showLoadingOnNextRefresh.current) {
-      showLoadingOnNextRefresh.current = false;
-      setIsLoading(true);
-    }
-    try {
-      const docs = await listDocuments();
-      const fp = documentsFingerprint(docs);
-      if (fp !== lastFingerprint.current) {
-        lastFingerprint.current = fp;
-        setDocuments(docs);
+  const refresh = useCallback(
+    async (options?: { background?: boolean }) => {
+      const background = options?.background ?? false;
+      if (!background && showLoadingOnNextRefresh.current) {
+        showLoadingOnNextRefresh.current = false;
+        dispatch(setDocumentsLoading(true));
       }
-      setError(null);
-      setApiUnreachable(false);
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : "Failed to load documents";
-      setError(message);
-      if (isApiUnreachableError(e)) setApiUnreachable(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      try {
+        const docs = await listDocuments();
+        const fp = documentsFingerprint(docs);
+        if (fp !== lastFingerprint.current) {
+          lastFingerprint.current = fp;
+          dispatch(setDocuments(docs));
+        } else {
+          dispatch(clearDocumentsFetchError());
+          dispatch(finishDocumentsLoading());
+        }
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Failed to load documents";
+        dispatch(
+          setDocumentsFetchError({
+            error: message,
+            apiUnreachable: isApiUnreachableError(e),
+          })
+        );
+      } finally {
+        dispatch(finishDocumentsLoading());
+      }
+    },
+    [dispatch]
+  );
 
   const hasProcessing = documents.some((d) => isDocumentProcessing(d.status));
 
@@ -64,19 +83,24 @@ export function useDocumentUpload() {
   });
 
   const upload = useCallback(
-    async (file: File) => {
-      setIsUploading(true);
-      setError(null);
+    async (
+      file: File,
+      options?: { allowedDepartments?: string; allowedRoles?: string }
+    ) => {
+      dispatch(setUploading(true));
+      dispatch(clearDocumentsFetchError());
       try {
-        await uploadDocument(file);
+        await uploadDocument(file, options);
         await refresh({ background: true });
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Upload failed");
+        dispatch(
+          setUploadError(e instanceof Error ? e.message : "Upload failed")
+        );
       } finally {
-        setIsUploading(false);
+        dispatch(setUploading(false));
       }
     },
-    [refresh]
+    [dispatch, refresh]
   );
 
   return {

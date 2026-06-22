@@ -1,4 +1,4 @@
-"""Single config file: backend/config/features.json"""
+"""Loads features.json — toggles UI modules and picks the active LLM provider."""
 
 from __future__ import annotations
 

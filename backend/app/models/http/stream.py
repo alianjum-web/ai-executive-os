@@ -21,11 +21,22 @@ class StreamErrorEvent(TypedDict):
 CitationJson = dict[str, str | int | None]
 
 
-class StreamDoneEvent(TypedDict):
+class RetrievalTraceJson(TypedDict, total=False):
+    original_query: str
+    expanded_queries: list[str]
+    candidates: list[dict]
+
+
+class StreamDoneEvent(TypedDict, total=False):
     type: Literal["done"]
     answer: str
     citations: list[CitationJson]
     latency_ms: int
+    confidence_score: float
+    escalated: bool
+    escalation_ticket_id: str | None
+    query_log_id: str | None
+    retrieval_trace: RetrievalTraceJson
 
 
 def citation_to_json(citation: Citation) -> CitationJson:

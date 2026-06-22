@@ -1,3 +1,10 @@
+"""
+Central config — which file loads is ENV_FILE (npm run dev vs prod).
+
+Wires Postgres, Redis, LLM keys, Slack secrets, CORS, and feature env overrides.
+Nothing in the app reads os.environ directly except this module.
+"""
+
 import os
 
 from pydantic import Field
@@ -6,6 +13,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _ENV_FILE = os.getenv("ENV_FILE", ".env.dev")
 
 class Settings(BaseSettings):
+    """Single source of truth for DB, Redis, LLM keys, Slack, and feature env overrides."""
+
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE, extra="ignore", populate_by_name=True
     )

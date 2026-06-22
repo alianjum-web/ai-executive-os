@@ -1,4 +1,4 @@
-"""Verify Supabase access tokens via JWKS (recommended) with optional legacy HS256 fallback."""
+"""Decode Bearer tokens — JWKS first, legacy HS256 fallback for old projects."""
 
 from __future__ import annotations
 

@@ -1,3 +1,10 @@
+"""
+Cryptographic trust boundary for POST /webhook/slack.
+
+Verifies X-Slack-Signature + timestamp before dedupe or Celery — rejects forged
+payloads. Required in production; skipped only when SLACK_SIGNING_SECRET is empty.
+"""
+
 import hashlib
 import hmac
 import time

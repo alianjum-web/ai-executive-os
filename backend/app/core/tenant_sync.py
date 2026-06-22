@@ -1,4 +1,9 @@
-"""Sync Supabase JWT identity into Postgres organizations + users."""
+"""
+Multi-tenant bootstrap on first authenticated request.
+
+Supabase Auth owns identity; this writes Organization + User rows in Postgres so
+RAG, tickets, and analytics can FK by org_id. Called from get_current_user.
+"""
 
 from __future__ import annotations
 

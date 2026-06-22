@@ -1,3 +1,5 @@
+"""Upload, parse, chunk, embed — queues Celery job for async processing."""
+
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,12 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.db.tables import ActivityLog, Document, DocumentChunk, User
 from app.services.chunking_service import ChunkingService
+from app.services.document_access_service import DocumentAccessService
 from app.services.document_parser import DocumentParser
 from app.services.embedding_service import EmbeddingService
 from app.services.vector_service import VectorService
 
 
 class DocumentService:
+    """Knowledge ingest orchestrator — file → chunks → vectors in Postgres."""
+
     def __init__(self) -> None:
         self.parser = DocumentParser()
         self.chunker = ChunkingService()
@@ -28,6 +33,8 @@ class DocumentService:
         *,
         user_id: uuid.UUID | None = None,
         org_id: uuid.UUID | None = None,
+        allowed_departments: list[str] | None = None,
+        allowed_roles: list[str] | None = None,
     ) -> Document:
         upload_root = Path(settings.upload_dir)
         upload_root.mkdir(parents=True, exist_ok=True)
@@ -56,6 +63,8 @@ class DocumentService:
             mime_type=mime_map.get(suffix),
             file_size_bytes=len(content),
             status="pending",
+            allowed_departments=allowed_departments,
+            allowed_roles=allowed_roles,
         )
         db.add(document)
         await self._log_activity(
@@ -131,7 +140,13 @@ class DocumentService:
         return result.scalar_one_or_none()
 
     async def list_documents(
-        self, db: AsyncSession, org_id: uuid.UUID | None = None
+        self,
+        db: AsyncSession,
+        org_id: uuid.UUID | None = None,
+        *,
+        user_role: str = "admin",
+        user_department: str | None = None,
+        rbac_enabled: bool = False,
     ) -> list[Document]:
         stmt = (
             select(Document)
@@ -140,8 +155,43 @@ class DocumentService:
         )
         if org_id is not None:
             stmt = stmt.where(Document.org_id == org_id)
+        if rbac_enabled and user_role != "admin":
+            access = DocumentAccessService()
+            stmt = stmt.where(
+                access.sqlalchemy_access_filter(
+                    role=user_role,
+                    department=user_department,
+                )
+            )
         result = await db.execute(stmt)
         return list(result.scalars().all())
+
+    async def update_access(
+        self,
+        db: AsyncSession,
+        document_id: uuid.UUID,
+        *,
+        org_id: uuid.UUID | None,
+        allowed_departments: list[str] | None,
+        allowed_roles: list[str] | None,
+        user_id: uuid.UUID | None = None,
+    ) -> Document | None:
+        document = await self.get_document(db, document_id, org_id=org_id)
+        if not document:
+            return None
+        document.allowed_departments = allowed_departments
+        document.allowed_roles = allowed_roles
+        await self._log_activity(
+            db,
+            user_id=user_id,
+            org_id=org_id,
+            action="document.access_update",
+            resource_type="document",
+            resource_id=document_id,
+        )
+        await db.commit()
+        await db.refresh(document)
+        return document
 
     async def delete_document(
         self,

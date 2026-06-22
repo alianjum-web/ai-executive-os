@@ -255,7 +255,7 @@ Pair with frontend: [`../frontend/README.md`](../frontend/README.md).
 | `npm run check:prod` | Validate `.env.production` |
 | `npm run verify:supabase` | URL, DB user ref, JWT project ref alignment |
 | `npm run db:check` | Test Postgres + Redis (dev) |
-| `npm run db:migrate` | `alembic upgrade head` (dev) |
+| `npm run db:migrate` | `supabase db push` via `scripts/db_push.sh` (dev) |
 | `npm run db:check:prod` | Connectivity (production env) |
 | `npm run db:migrate:prod` | Migrations against production DB |
 | `npm run dev` | **Daily dev** — Docker + checks + API reload + Celery |
@@ -271,7 +271,7 @@ Scripts set `ENV_FILE=.env.dev` or `.env.production` and use `.venv/bin/` for Py
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-ENV_FILE=.env.dev alembic upgrade head
+cd backend && npm run db:migrate
 ENV_FILE=.env.dev uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 # second terminal:
 ENV_FILE=.env.dev celery -A app.tasks.celery_app.celery_app worker --loglevel=info
@@ -291,7 +291,7 @@ backend/
 │   ├── models/                 # SQLAlchemy + Pydantic schemas
 │   ├── services/               # RAG, embeddings, documents, LLM, tickets, analytics
 │   └── tasks/                  # Celery app + document/slack tasks
-├── alembic/                    # DB migrations
+├── supabase/migrations/        # DB migrations (Supabase CLI — single source of truth)
 ├── config/
 │   └── features.json           # Feature flags + ai_provider
 ├── scripts/
@@ -323,7 +323,7 @@ Map with frontend: [`../docs/CORE_FILES.md`](../docs/CORE_FILES.md)
 ### Data and tenancy
 
 - **Postgres** — organizations, users, documents, chunks, vectors (`pgvector`), tickets, query logs
-- **Alembic** — schema changes in `alembic/versions/`
+- **Supabase CLI** — schema changes in `supabase/migrations/` (see [`../supabase/README.md`](../supabase/README.md))
 - **Multi-tenant** — JWT `org_id` / `user_id`; rows scoped per organization
 
 ---

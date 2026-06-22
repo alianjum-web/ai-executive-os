@@ -1,4 +1,12 @@
+"""
+Inbound integrations — currently Slack Events API only.
+
+Verify signature → dedupe (Redis) → enqueue Celery. Never creates tickets inline;
+that keeps Slack retries cheap and response time under Slack's 3s expectation.
+"""
+
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request
@@ -12,6 +20,8 @@ from app.models.http.errors import SlackChallengeResponse, SlackWebhookAck
 from app.models.http.slack import SlackEventCallbackPayload
 from app.tasks.slack_tasks import enqueue_slack_event
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
@@ -19,8 +29,11 @@ router = APIRouter()
 async def slack_webhook(request: Request):
     if not flags.SLACK_WEBHOOK_ENABLED:
         raise HTTPException(status_code=404, detail="Slack webhook is not enabled")
-    if not flags.PROJECT_AGENT_ENABLED:
-        raise HTTPException(status_code=404, detail="Project agent is not enabled")
+    if not flags.PROJECT_AGENT_ENABLED and not flags.SLACK_QA_ENABLED:
+        raise HTTPException(
+            status_code=404,
+            detail="Slack webhook requires PROJECT_AGENT_ENABLED or SLACK_QA_ENABLED",
+        )
 
     body = await request.body()
     verify_slack_signature(
@@ -39,13 +52,27 @@ async def slack_webhook(request: Request):
         event = payload.get("event") or {}
         if should_process_slack_message(event):
             dedupe_key = slack_dedupe_key(payload, event)
-            if await slack_event_dedupe.claim(dedupe_key):
+            claimed = await slack_event_dedupe.claim(dedupe_key)
+            if claimed:
                 resolved_org: uuid.UUID | None = None
                 if settings.default_org_id:
                     resolved_org = uuid.UUID(settings.default_org_id)
+                logger.info(
+                    "slack_webhook_enqueue event_id=%s channel=%s ts=%s dedupe_key=%s",
+                    payload.get("event_id"),
+                    event.get("channel"),
+                    event.get("ts"),
+                    dedupe_key,
+                )
                 enqueue_slack_event(
                     payload,
                     str(resolved_org) if resolved_org else None,
+                )
+            else:
+                logger.info(
+                    "slack_webhook_dedupe_skip event_id=%s dedupe_key=%s",
+                    payload.get("event_id"),
+                    dedupe_key,
                 )
 
     return SlackWebhookAck()

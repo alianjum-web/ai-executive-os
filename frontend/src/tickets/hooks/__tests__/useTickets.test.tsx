@@ -1,4 +1,5 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
+import { renderHookWithStore } from "@/common/store/test-utils";
 import { useTickets } from "../useTickets";
 
 jest.mock("@/common/api/client", () => ({
@@ -17,7 +18,7 @@ describe("useTickets", () => {
   it("finishes loading with empty tickets", async () => {
     mockList.mockResolvedValue([]);
 
-    const { result } = renderHook(() => useTickets());
+    const { result } = renderHookWithStore(() => useTickets());
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -34,7 +35,7 @@ describe("useTickets", () => {
       )
     );
 
-    const { result } = renderHook(() => useTickets());
+    const { result } = renderHookWithStore(() => useTickets());
 
     await act(async () => {
       await result.current.refresh();

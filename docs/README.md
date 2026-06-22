@@ -16,6 +16,7 @@ Frontend and backend both link here — we do **not** copy the same tables into 
 | File | Audience | Description |
 |------|----------|-------------|
 | [PROJECT_MASTER.md](./PROJECT_MASTER.md) | Everyone | Product vision, sprints, RAG §8, schema, LangGraph |
+| [PRODUCT_STRATEGY_AND_ROADMAP.md](./PRODUCT_STRATEGY_AND_ROADMAP.md) | Product / you | **What you built, market comparison, RBAC vs executive access, what to implement next** |
 | [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) | DevOps / devs | §9 env reference (PDF + as implemented) |
 | [CURSOR_RULES.md](./CURSOR_RULES.md) | Cursor / AI | §10 rules (mirror of root `cursor.md`) |
 | [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) | Release | Sprint 5 security checklist |
@@ -38,4 +39,3 @@ Frontend and backend both link here — we do **not** copy the same tables into 
 
 - [`../frontend/README.md`](../frontend/README.md) — how to run Next.js
 - [`../backend/README.md`](../backend/README.md) — how to run FastAPI/Celery  
-- [`../frontend/docs/README.md`](../frontend/docs/README.md) — redirect stub (no duplicate content)
