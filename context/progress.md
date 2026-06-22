@@ -19,6 +19,25 @@ Track major initiatives and migration status. Update this file when shipping spe
 | Backend design patterns doc | ✅ | [`code-desing-patterns.md`](code-desing-patterns.md) |
 | `backend/AGENTS.md` pointer | ✅ | Agents must read design patterns before coding |
 
+### Remote Supabase — applied (2026-06-22)
+
+All 7 migrations synced to project `lgwflmidlforeslbadpb`:
+
+```text
+20260603000001 … 20260603000007  (local = remote)
+```
+
+Fixes applied:
+- `supabase/config.toml`: `major_version = 15`, `project_id = lgwflmidlforeslbadpb`
+- `db_push.sh`: auto-switch pooler `6543` → `5432` for migrations
+- Removed accidental empty migration `20260622041244_my_feature.sql`
+
+Verify anytime:
+
+```bash
+cd backend && npm run db:migration:list
+```
+
 ### Your next steps (manual)
 
 1. **Install Supabase CLI** (if not installed):

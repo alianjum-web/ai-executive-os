@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$ROOT/.." && pwd)"
 ENV_FILE="${1:-.env.dev}"
 ENV_PATH="$ROOT/$ENV_FILE"
 
@@ -29,6 +30,14 @@ fi
 
 DB_URL="${DATABASE_URL/postgresql+asyncpg/postgresql}"
 
-echo "Applying Supabase migrations → $(echo "$DB_URL" | sed -E 's#(://[^:]+:)[^@]+#\1***#')"
-cd "$ROOT/.."
-supabase db push --db-url "$DB_URL"
+# Supabase pooler: port 6543 = transaction mode (no DDL). Migrations need session mode on 5432.
+if [[ "$DB_URL" == *".pooler.supabase.com:6543"* ]]; then
+  DB_URL="${DB_URL/:6543/:5432}"
+  echo "Note: switched pooler port 6543 → 5432 (session mode required for migrations)" >&2
+fi
+
+MASKED_URL="$(echo "$DB_URL" | sed -E 's#(://[^:]+:)[^@]+#\1***#')"
+echo "Applying Supabase migrations → $MASKED_URL"
+
+cd "$REPO_ROOT"
+supabase db push --db-url "$DB_URL" --yes

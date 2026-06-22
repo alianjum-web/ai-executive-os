@@ -1,5 +1,5 @@
 # Supabase CLI — https://supabase.com/docs/guides/cli/config
-project_id = "ai-executive-os"
+project_id = "lgwflmidlforeslbadpb"
 
 [api]
 enabled = true
@@ -11,7 +11,7 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 16
+major_version = 15
 
 [db.pooler]
 enabled = false

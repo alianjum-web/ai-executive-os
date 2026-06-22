@@ -11,7 +11,7 @@
 
     "db:check": "ENV_FILE=.env.dev .venv/bin/python scripts/check_services.py",
     "db:migrate": "bash scripts/db_push.sh .env.dev",
-    "db:migration:list": "bash -c 'set -a && source .env.dev && set +a && supabase migration list --db-url \"${DATABASE_URL/postgresql+asyncpg/postgresql}\"'",
+    "db:migration:list": "bash -c 'set -a && source .env.dev && set +a && DB_URL=\"${DATABASE_URL/postgresql+asyncpg/postgresql}\"; DB_URL=\"${DB_URL/:6543/:5432}\"; supabase migration list --db-url \"$DB_URL\"'",
     "db:check:prod": "ENV_FILE=.env.production .venv/bin/python scripts/check_services.py",
     "db:migrate:prod": "bash scripts/db_push.sh .env.production",
 

@@ -69,6 +69,15 @@ For a **fresh empty database**, `supabase db push` applies all files in order.
 
 For an **Alembic-managed database**, use `migration repair` (above) instead of re-applying DDL.
 
+## Error: `Invalid db.major_version: 16`
+
+Set `major_version = 15` in `supabase/config.toml`. The npm-installed CLI may reject 16 even when your remote project runs Postgres 15.
+
+## Error: migrations fail on pooler port 6543
+
+`DATABASE_URL` with `:6543` is the **transaction** pooler — it cannot run DDL.  
+Use session pooler **`:5432`** for migrations. `backend/scripts/db_push.sh` auto-converts `6543 → 5432`.
+
 ## Agent / contributor rules
 
 1. **Never** edit schema in the Supabase Dashboard UI — always add a migration file.
