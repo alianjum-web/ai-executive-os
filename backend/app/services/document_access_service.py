@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import or_
 
+from sqlalchemy import true
 from app.models.db.tables import Document
 
 
@@ -30,7 +31,7 @@ class DocumentAccessService:
     def sqlalchemy_access_filter(self, *, role: str, department: str | None):
         """Admin sees all org docs; others must match allowed_roles / allowed_departments."""
         if role == "admin":
-            return True
+            return true()
 
         role_match = or_(
             Document.allowed_roles.is_(None),

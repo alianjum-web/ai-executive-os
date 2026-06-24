@@ -18,6 +18,8 @@ from app.tasks.connector_tasks import resync_connectors_for_org_task
 from app.models.internal.coerce import as_document_status
 from app.services.connector_service import ConnectorService
 from app.services.integration_settings_service import IntegrationSettingsService
+from typing import cast
+from celery import Task
 
 router = APIRouter()
 
@@ -42,7 +44,7 @@ async def resync_all_connectors(
     if not flags.CONNECTOR_SYNC_ENABLED:
         raise HTTPException(status_code=404, detail="Connector sync is not enabled")
     resolved = str(org_id or auth.org_id)
-    resync_connectors_for_org_task.delay(resolved)
+    cast(Task, resync_connectors_for_org_task).delay(resolved)
     return {"message": "Connector re-sync queued", "org_id": resolved}
 
 
