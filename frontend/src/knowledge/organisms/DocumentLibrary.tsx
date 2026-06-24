@@ -20,7 +20,7 @@ export function DocumentLibrary() {
   const rbacEnabled = useFeatureFlag("DOCUMENT_RBAC_ENABLED");
   const { isAdmin } = useRole();
   const [editingAccessId, setEditingAccessId] = useState<string | null>(null);
-  const { documents, isUploading, error, apiUnreachable, upload, refresh, isLoading } =
+  const { documents, isUploading, error, upload, refresh, isLoading } =
     useDocumentUpload();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 

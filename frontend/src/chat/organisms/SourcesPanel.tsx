@@ -13,20 +13,20 @@ function usePdfBlobUrl(documentId: string | undefined) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!documentId) {
-      setBlobUrl(null);
-      return;
-    }
+    if (!documentId) return;
+
     let revoked: string | null = null;
     let cancelled = false;
 
-    (async () => {
+    async function fetchPdf() {
       try {
         const headers = await getAuthHeaders();
-        const res = await fetch(documentFileUrl(documentId), { headers });
+        const res = await fetch(documentFileUrl(documentId!), { headers });
         if (!res.ok) throw new Error("Could not load PDF");
+        
         const blob = await res.blob();
         if (cancelled) return;
+
         revoked = URL.createObjectURL(blob);
         setBlobUrl(revoked);
         setError(null);
@@ -36,15 +36,19 @@ function usePdfBlobUrl(documentId: string | undefined) {
           setError("PDF preview unavailable");
         }
       }
-    })();
+    }
+
+    fetchPdf();
 
     return () => {
       cancelled = true;
-      if (revoked) URL.revokeObjectURL(revoked);
+      if (revoked) {
+        URL.revokeObjectURL(revoked);
+      }
     };
   }, [documentId]);
 
-  return { blobUrl, error };
+  return { blobUrl: documentId ? blobUrl : null, error: documentId ? error : null };
 }
 
 function displayDocName(name: string): string {

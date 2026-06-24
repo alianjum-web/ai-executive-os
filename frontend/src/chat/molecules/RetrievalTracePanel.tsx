@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import type { RetrievalTrace } from "@/common/types";
-import { cn } from "@/common/lib/utils";
 
 const STAGE_LABELS: Record<string, string> = {
   retrieved: "Retrieved",

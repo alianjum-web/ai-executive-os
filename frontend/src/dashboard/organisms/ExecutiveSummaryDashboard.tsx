@@ -1,68 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { Clock, MessageSquare, TrendingUp, AlertTriangle } from "lucide-react";
-import { fetchExecutiveSummary } from "@/common/api/client";
-import type { ExecutiveSummary } from "@/common/types";
-import { Card, CardContent } from "@/common/atoms/ui/card";
+import { useEffect } from "react";
 import { Skeleton } from "@/common/atoms/ui/skeleton";
 import { ErrorState } from "@/common/molecules/ErrorState";
-
-function KpiCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-1 font-display text-2xl font-semibold tabular-nums">
-              {value}
-            </p>
-            {hint ? (
-              <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-            ) : null}
-          </div>
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-blue/10 text-accent-blue">
-            <Icon className="h-4 w-4" aria-hidden />
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+import { KpiCard } from "@/dashboard/atoms/KpiCard";
+import { Card, CardContent } from "@/common/atoms/ui/card";
+import { useExecutiveSummary } from "@/dashboard/hooks/useExecutiveSummary";
 
 export function ExecutiveSummaryDashboard() {
-  const [summary, setSummary] = useState<ExecutiveSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { summary, error, loading, load } = useExecutiveSummary();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setSummary(await fetchExecutiveSummary());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load executive summary");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // ✅ Effect only calls load and doesn't directly manage state
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
-  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (error) return <ErrorState message={error} onRetry={load} />;
   if (loading || !summary) {
     return <Skeleton className="h-40 w-full rounded-xl" />;
   }
