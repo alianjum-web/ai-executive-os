@@ -1,51 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { fetchEvaluationMetrics } from "@/common/api/client";
-import type { EvaluationMetrics } from "@/common/types";
+import { useEffect } from "react";
 import { useFeatureFlag } from "@/common/hooks/useFeatureFlag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/common/atoms/ui/card";
 import { Skeleton } from "@/common/atoms/ui/skeleton";
 import { ErrorState } from "@/common/molecules/ErrorState";
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="mt-1 font-display text-2xl font-semibold tabular-nums">
-          {value}
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
+import { Metric } from "@/dashboard/atoms/Metric";
+import { useEvaluationMetrics } from "@/dashboard/hooks/useEvaluationMetrics";
 
 export function EvaluationDashboard() {
   const enabled = useFeatureFlag("EVALUATION_DASHBOARD_ENABLED");
-  const [metrics, setMetrics] = useState<EvaluationMetrics | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { metrics, error, loading, load } = useEvaluationMetrics(enabled);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchEvaluationMetrics();
-      setMetrics(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load evaluation metrics");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // ✅ Effect only triggers the load function when enabled changes
   useEffect(() => {
-    if (enabled) void load();
+    if (enabled) {
+      load();
+    }
   }, [enabled, load]);
 
   if (!enabled) return null;
-  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
+  if (error) return <ErrorState message={error} onRetry={load} />;
   if (loading || !metrics) {
     return <Skeleton className="h-48 w-full rounded-xl" />;
   }
@@ -107,3 +82,4 @@ export function EvaluationDashboard() {
     </section>
   );
 }
+
