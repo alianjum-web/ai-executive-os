@@ -166,7 +166,8 @@ jobs:
           version: latest
 
       - name: Apply Supabase migrations
-        run: supabase db push --db-url postgresql://postgres:postgres@127.0.0.1:5432/sop_automator
+        # Added ?sslmode=disable to the end of the connection string below
+        run: supabase db push --db-url "postgresql://postgres:postgres@127.0.0.1:5432/sop_automator?sslmode=disable"
 
   docker-build:
     name: Docker — image build
