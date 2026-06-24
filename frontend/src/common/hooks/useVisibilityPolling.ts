@@ -33,22 +33,28 @@ export function useVisibilityPolling({
   pauseWhenHidden = true,
   getIntervalMs,
 }: UseVisibilityPollingOptions) {
-  const mountedAt = useRef(Date.now());
+  // ✅ Move the Date.now() call inside the effect, not during render
+  const mountedAtRef = useRef<number | null>(null);
   const onPollRef = useRef(onPoll);
   const getIntervalMsRef = useRef(getIntervalMs);
-  onPollRef.current = onPoll;
-  getIntervalMsRef.current = getIntervalMs;
+
+  // ✅ Update refs in an effect, not during render
+  useEffect(() => {
+    onPollRef.current = onPoll;
+    getIntervalMsRef.current = getIntervalMs;
+  }, [onPoll, getIntervalMs]);
 
   useEffect(() => {
     if (!enabled) return;
 
-    mountedAt.current = Date.now();
+    // ✅ Set the mounted time inside the effect
+    mountedAtRef.current = Date.now();
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const resolveInterval = () => {
       const dynamic = getIntervalMsRef.current;
       if (dynamic) return dynamic();
-      const elapsed = Date.now() - mountedAt.current;
+      const elapsed = Date.now() - (mountedAtRef.current || Date.now());
       return elapsed < fastDurationMs ? fastIntervalMs : intervalMs;
     };
 
@@ -67,6 +73,7 @@ export function useVisibilityPolling({
       schedule();
     };
 
+    // Initial poll
     void Promise.resolve(onPollRef.current());
     schedule();
 
