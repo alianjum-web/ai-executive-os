@@ -1,5 +1,3 @@
-"use client";
-
 import { CommandCenter } from "@/dashboard/organisms/CommandCenter";
 
 export function DashboardScreen() {
