@@ -9,7 +9,7 @@ import json
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from typing import TypedDict, cast
+from typing_extensions import TypedDict, cast
 
 from langgraph.graph import END, StateGraph
 from sqlalchemy.ext.asyncio import AsyncSession

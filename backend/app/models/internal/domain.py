@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import TypedDict, cast
+from typing_extensions import TypedDict, cast
 
 
 class RagChunkItem(TypedDict):
