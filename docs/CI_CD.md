@@ -36,7 +36,7 @@ npm test -- --ci
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 \
 NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=placeholder \
-npm run build:ci
+npm run build
 ```
 
 ---
