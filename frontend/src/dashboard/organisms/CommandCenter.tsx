@@ -3,12 +3,13 @@
 import { AIStatusPanel } from "@/dashboard/molecules/AIStatusPanel";
 import { QuickActions } from "@/dashboard/organisms/QuickActions";
 import { useRole } from "@/common/hooks/useRole";
-import { EmployeeWelcome } from "../atoms/EmployeeWelcome";
-import { ManagerWelcome } from "../atoms/ManagerWelcome";
-import { LeadershipDashboard } from "./LeaderShipBoard";
+import { EmployeeWelcome } from "@/dashboard/atoms/EmployeeWelcome";
+import { ManagerWelcome } from "@/dashboard/atoms/ManagerWelcome";
+import { LeadershipDashboard } from "@/dashboard/organisms/LeaderShipBoard";
+import { ExecutiveSummary } from "@/common/types";
 
 
-export function CommandCenter() {
+export function CommandCenter({executiveSummary}: {executiveSummary: ExecutiveSummary | null}) {
   const { isAdmin, isManager, isLeadership } = useRole();
 
   if (!isLeadership) {
@@ -27,10 +28,14 @@ export function CommandCenter() {
     return (
       <div className="space-y-6">
         <ManagerWelcome />
-        <LeadershipDashboard showDemoSeed={false} />
+        <LeadershipDashboard 
+        showDemoSeed={false} 
+        executiveSummary={executiveSummary ?? null} />
       </div>
     );
   }
 
-  return <LeadershipDashboard showDemoSeed={isAdmin} />;
+  return <LeadershipDashboard 
+  showDemoSeed={isAdmin} 
+  executiveSummary={executiveSummary ?? null} />;
 }

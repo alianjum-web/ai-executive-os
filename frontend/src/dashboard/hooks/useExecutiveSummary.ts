@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useCallback } from "react";
 import { fetchExecutiveSummary } from "@/common/api/client";
 import type { ExecutiveSummary } from "@/common/types";
